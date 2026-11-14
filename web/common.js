@@ -93,7 +93,10 @@ export function cameraHelp(e) {
     return "No camera found. Pick another camera from the list, or check that the webcam is connected.";
   if (n === "NotReadableError" || n === "AbortError" || n === "TrackStartError")
     return "The camera is busy or failed to start. Close FaceTime, Zoom, Photo Booth or other tabs using it, then Retry.";
-  if (n === "Timeout") return "The camera started but sends no picture. Pick another camera from the list or Retry.";
+  if (n === "Timeout")
+    return "The browser got the camera but no picture arrives. Usually macOS is blocking it: System Settings → Privacy & Security → Camera → " +
+      "turn on Brave, then quit Brave fully (Cmd+Q) and reopen. Also close Zoom/FaceTime/Photo Booth and other Unmute tabs, " +
+      "or pick another camera in the list and press Retry. [" + e.message + "]";
   return `Camera error (${n || "unknown"}): ${(e && e.message) || e}`;
 }
 
@@ -121,14 +124,20 @@ export async function startCamera(video, deviceId = null) {
   currentStream = stream;
   video.muted = true; video.playsInline = true;
   video.srcObject = stream;
-  try { await video.play(); } catch {}
+  // Don't await play(): if the camera never sends a frame, that promise never settles.
+  video.play().catch(() => {});
   // Wait until real frames arrive (some Mac cameras take a moment to wake up).
   const t0 = performance.now();
-  while (!(video.videoWidth > 0 && video.readyState >= 2)) {
-    if (performance.now() - t0 > 6000) throw Object.assign(new Error("no frames from camera"), { name: "Timeout" });
-    await new Promise((r) => setTimeout(r, 100));
-  }
   const track = stream.getVideoTracks()[0];
+  while (!(video.videoWidth > 0 && video.readyState >= 2)) {
+    if (performance.now() - t0 > 8000) {
+      const why = `track ${track ? track.readyState : "none"}, muted=${track ? track.muted : "?"}, label="${track ? track.label : ""}"`;
+      stream.getTracks().forEach((t) => t.stop()); currentStream = null;
+      throw Object.assign(new Error("no frames from camera (" + why + ")"), { name: "Timeout" });
+    }
+    if (performance.now() - t0 > 2500) video.play().catch(() => {});
+    await new Promise((r) => setTimeout(r, 150));
+  }
   return { label: track.label, deviceId: track.getSettings().deviceId, width: video.videoWidth, height: video.videoHeight };
 }
 
@@ -167,6 +176,9 @@ export class CameraControl {
     this.msgEl.classList.remove("hidden");
     this.msgEl.textContent = "Starting camera… (allow access if Chrome asks)";
     this.retry.disabled = true;
+    const slow = setTimeout(() => {
+      if (!this.ok) this.msgEl.textContent = "Still waiting for the camera… If the browser shows a permission prompt near the address bar, click Allow.";
+    }, 4000);
     const wanted = settings.get("cameraId", null);
     try {
       let info;
@@ -186,7 +198,7 @@ export class CameraControl {
       const help = cameraHelp(e);
       this.msgEl.textContent = help;
       this.onError(help, e);
-    } finally { this.retry.disabled = false; }
+    } finally { clearTimeout(slow); this.retry.disabled = false; }
     return this.ok;
   }
 }
