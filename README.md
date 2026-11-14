@@ -41,7 +41,8 @@ Unmute is a communication aid. It is not a medical device and it does not diagno
   3 s, and resting times are remembered in `data/gemini_state.json`.
 - **Works offline.** If there is no key, no network, or Gemini takes longer than 3 seconds, Unmute uses the
   classifier's top 3 and shows an "offline mode" badge. Speech uses the browser's built-in voices. To load the face
-  tracker without internet, run `scripts/fetch_vendor.sh` once.
+  tracker without internet, run `scripts/fetch_vendor.sh` once (22 MB into `web/vendor/`, gitignored); the page then
+  makes no requests to the internet at all, which we checked in the browser's network log.
 - **Confirm with whatever movement the patient has** (Settings → "How does the patient confirm"):
   - **Nod**: pitch down and back within 1.5 s confirms; shake moves to the next choice.
   - **Button / switch**: the choices light up one by one; one press picks the lit one. Any USB button or
@@ -103,8 +104,18 @@ Chance is 10% top-1 and 30% top-3. Measured on 14 November 2026 with the default
 | + hubness correction (stops short phrases like "Yes" soaking up wrong answers) | 47.5% | 73.8% |
 
 These settings were picked using these same 80 samples, so the numbers are optimistic until they are re-measured
-on new recordings. pankaj's samples of the same phrase differ a lot from each other, and the calibration
-consistency check now flags this while recording.
+on new recordings. pankaj's samples of the same phrase differed a lot from each other; his recordings were deleted
+on 14 November for re-calibration, so the Proof page now shows the current recordings, not this table.
+
+**More samples per phrase help, measured.** Random subsets of rishi's recordings, leave-one-out:
+2 samples per phrase 51% top-1 / 70% top-3; 3 samples 64% / 92%; 4 samples 75% / 95%. The calibration default is
+now 6 samples per phrase, recorded in a row, which has not been measured yet.
+
+**When one person's samples don't match each other.** For one calibrating team member, two recordings of the same
+phrase were on average as far apart as recordings of different phrases (distance ratio 1.00, against 0.79 for
+rishi). No feature setting we tried (smoothing, no velocity, per-recording scaling, longer resampling, wider DTW
+band) changed that. The fix is in the recording, not the maths: mouth each sample the same way, keep the head still
+and facing the camera, and record the samples of a phrase one after another.
 
 **Gemini in this test.** Leave-one-out has no bedside context: no care note and no recent requests. In an earlier
 run, before the hubness correction, Gemini answered 28 of the 80 calls before the free quota ran out (the rest fell
