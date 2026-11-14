@@ -80,7 +80,9 @@ ntfy.sh topics are public, so the topic name is random and hard to guess.
 2. **Patient** (`/`): enter the same name under Settings, hold Space, mouth a sentence, release, then nod.
 3. **Nurse** (`/nurse.html`): live request log, red rows for urgent requests, Acknowledge button. Click
    "Enable alarm sound" once.
-4. **Proof** (`/proof.html`): measured accuracy. Or run `.venv/bin/python scripts/evaluate.py`
+4. **Before a demo**: `.venv/bin/python scripts/demo_check.py <name>` prints OK / WARN / FAIL for the server, Gemini,
+   offline files, the presenter's calibration, the best measured phrases to show, and the nurse log.
+5. **Proof** (`/proof.html`): measured accuracy. Or run `.venv/bin/python scripts/evaluate.py`
    (`--sweep` compares classifier settings, `--with-gemini` adds the re-ranked numbers).
 
 ## Measured results
@@ -143,7 +145,7 @@ All JSON. A frame is a flat list of floats: `[mouth blendshapes (dims.bs) | lip 
 ```
 server/  app.py (API + static), features.py, classifier.py (DTW k-NN), rerank.py (Gemini), alerts.py (ntfy), evaluation.py
 web/     index.html + app.js (patient), enroll.*, nurse.*, proof.*, common.js, style.css
-scripts/ evaluate.py, fetch_vendor.sh
+scripts/ evaluate.py, demo_check.py, fetch_vendor.sh
 data/    phrases.json, enrollments/*.json, requests.jsonl, results.json
 ```
 

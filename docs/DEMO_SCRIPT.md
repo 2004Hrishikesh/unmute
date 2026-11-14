@@ -1,6 +1,11 @@
 # Unmute: demo script for the judges
 
-Four minutes. One presenter at the laptop, one teammate holding a phone with the ntfy app.
+Four minutes. **Presenter: Rishi** (best measured accuracy). One teammate holding a phone with the ntfy app.
+
+**Phrases to use on stage** (Rishi's measured top-1, leave-one-out, 4 samples each): "I need water", "I cannot
+breathe", "I am in pain", "Call my family", "No" were right first time 100% of the time. **Avoid** "Thank you" and
+"Yes" (25% first time; they get confused with each other and with "No"). Re-check on /proof.html after
+re-calibrating.
 
 ## Setup checklist, 10 minutes before
 
@@ -10,14 +15,18 @@ Do these in order. Tick each one.
   ```bash
   .venv/bin/uvicorn server.app:app --port 8000
   ```
+- [ ] Run the readiness check. It prints OK / WARN / FAIL per item and the best phrases to demo:
+  ```bash
+  .venv/bin/python scripts/demo_check.py rishi
+  ```
 - [ ] Quit Zoom, FaceTime, and anything else that might hold the camera.
 - [ ] Open **Brave** at <http://localhost:8000> and **allow the camera**.
 - [ ] In the camera picker under the video, pick the **built-in Mac camera**, not the iPhone camera. Wait for the
       teal lip outline on your face.
 - [ ] Sit facing a window or a lamp. Light on your face, not behind you. If the yellow "Turn on the bed light"
       banner shows, move.
-- [ ] **The presenter is the person with the best measured accuracy.** Check <http://localhost:8000/proof.html>.
-      Right now that is rishi: 75% top-1, 95% top-3 on the 10-phrase demo set.
+- [ ] **The presenter is Rishi**, the person with the best measured accuracy: 75% top-1, 95% top-3 on the
+      10-phrase demo set with 4 samples per phrase. Re-check <http://localhost:8000/proof.html> after re-calibrating.
 - [ ] Open **Settings** under the video. Type the presenter's name. Make sure "How does the patient confirm" is on
       **Nod**. Check the top-right badge:
   - "Gemini context on": great.
@@ -69,9 +78,9 @@ Open **Settings**, change "How does the patient confirm" to **Button / switch**.
 > "Many ICU patients can't move their head. So the cards light up one by one, and any button picks the lit one.
 > A fifty-dollar assistive switch, or a finger on the space bar."
 
-Hold Space, mouth **"Thank you"**, let go. Cards scan. Press **Space** when the right one is lit. It speaks.
+Hold Space, mouth **"Call my family"**, let go. Cards scan. Press **Space** when the right one is lit. It speaks.
 
-Optional if time allows: switch to **Long blink**, mouth "Yes", close your eyes for a second on the lit card.
+Optional if time allows: switch to **Long blink**, mouth "No", close your eyes for a second on the lit card.
 
 > "Or just the eyelids. Whatever movement the patient still has."
 
@@ -95,7 +104,8 @@ Teammate clicks **Acknowledge** on the Nurse page. The alarm stops on the patien
 Click **Proof**.
 
 > "These are measured numbers from our own recordings, leave-one-out. Right now the correct sentence is in the
-> three cards 95% of the time for me, 74% across all of us. Across the hackathon we took the recogniser from
+> three cards 95% of the time for me, and [read the overall top-3 number from the Proof page] across all of us.
+> Across the hackathon we took the recogniser from
 > 19% to 47% top-1 by fixing normalisation, adding lip velocity, and correcting for short phrases that soak up
 > wrong answers. These settings were tuned on the same recordings, so we expect lower numbers on new people until
 > we re-measure. We only show what we measured."
