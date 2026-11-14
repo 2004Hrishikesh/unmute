@@ -256,12 +256,14 @@ def _consistency_check(user: str, sid: str, phrase: str) -> dict | None:
     if rec is None:
         return None
     ids = [s.get("id") for s in rec.samples]
-    if sid not in ids or rec.phrases.count(phrase) < 2:
+    # With only one other sample of the phrase the comparison is too noisy to act on: say nothing yet.
+    if sid not in ids or rec.phrases.count(phrase) < 3:
         return None
     i = ids.index(sid)
     ranked = rec.rank(rec.samples[i]["frames"], top=3, exclude=i)
     names = [r["phrase"] for r in ranked]
-    return {"matches": bool(names and names[0] == phrase), "in_top3": phrase in names, "looks_like": names[0] if names else None}
+    return {"matches": bool(names and names[0] == phrase), "in_top3": phrase in names,
+            "looks_like": names[0] if names else None, "others": rec.phrases.count(phrase) - 1}
 
 
 @app.delete("/api/enrollments/last")

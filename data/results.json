@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-14 15:35:57",
+  "generated_at": "2026-11-14 15:46:41",
   "method": "leave-one-out, per user (each sample is matched only against that user's other samples)",
   "config": {
     "length": 30,
@@ -16,119 +16,134 @@
   },
   "with_gemini": false,
   "overall": {
-    "samples": 80,
-    "top1": 0.475,
-    "top3": 0.7375
+    "samples": 66,
+    "top1": 0.5455,
+    "top3": 0.7121
   },
   "users": {
-    "pankaj": {
-      "samples": 40,
-      "phrases": 10,
-      "top1": 0.2,
-      "top3": 0.525,
-      "chance_top1": 0.1,
-      "chance_top3": 0.3,
+    "kesh": {
+      "samples": 26,
+      "phrases": 13,
+      "top1": 0.2308,
+      "top3": 0.3462,
+      "chance_top1": 0.0769,
+      "chance_top3": 0.2308,
       "per_phrase": {
         "Call my family": {
-          "n": 4,
-          "top1": 0.25,
-          "top3": 1.0
-        },
-        "Call the nurse": {
-          "n": 4,
+          "n": 2,
           "top1": 0.0,
-          "top3": 0.5
+          "top3": 0.0
         },
         "I am cold": {
-          "n": 4,
-          "top1": 0.25,
-          "top3": 0.25
+          "n": 2,
+          "top1": 0.0,
+          "top3": 0.0
         },
-        "I am in pain": {
-          "n": 4,
-          "top1": 0.75,
-          "top3": 1.0
+        "I am hot": {
+          "n": 2,
+          "top1": 0.0,
+          "top3": 0.0
+        },
+        "I am scared": {
+          "n": 2,
+          "top1": 0.0,
+          "top3": 0.0
         },
         "I cannot breathe": {
-          "n": 4,
+          "n": 2,
           "top1": 0.0,
-          "top3": 0.25
+          "top3": 0.0
         },
-        "I love you": {
-          "n": 4,
-          "top1": 0.25,
-          "top3": 0.5
+        "I feel sick": {
+          "n": 2,
+          "top1": 0.5,
+          "top3": 1.0
         },
-        "I need water": {
-          "n": 4,
+        "I need the toilet": {
+          "n": 2,
+          "top1": 0.0,
+          "top3": 0.0
+        },
+        "Move my pillow": {
+          "n": 2,
           "top1": 0.0,
           "top3": 0.0
         },
         "No": {
-          "n": 4,
-          "top1": 0.25,
-          "top3": 0.75
+          "n": 2,
+          "top1": 1.0,
+          "top3": 1.0
         },
         "Thank you": {
-          "n": 4,
+          "n": 2,
+          "top1": 0.0,
+          "top3": 0.0
+        },
+        "What time is it": {
+          "n": 2,
           "top1": 0.0,
           "top3": 0.5
         },
+        "Where am I": {
+          "n": 2,
+          "top1": 1.0,
+          "top3": 1.0
+        },
         "Yes": {
-          "n": 4,
-          "top1": 0.25,
-          "top3": 0.5
+          "n": 2,
+          "top1": 0.5,
+          "top3": 1.0
         }
       },
       "confusions": [
         {
-          "said": "Call the nurse",
-          "predicted": "Yes",
-          "count": 3
-        },
-        {
-          "said": "I love you",
-          "predicted": "Yes",
-          "count": 2
-        },
-        {
-          "said": "No",
-          "predicted": "I cannot breathe",
-          "count": 2
-        },
-        {
-          "said": "Yes",
-          "predicted": "I love you",
+          "said": "What time is it",
+          "predicted": "Where am I",
           "count": 2
         },
         {
           "said": "Call my family",
-          "predicted": "I am cold",
+          "predicted": "I need the toilet",
           "count": 1
         },
         {
           "said": "Call my family",
-          "predicted": "I need water",
-          "count": 1
-        },
-        {
-          "said": "Call my family",
-          "predicted": "I am in pain",
-          "count": 1
-        },
-        {
-          "said": "Call the nurse",
-          "predicted": "I love you",
+          "predicted": "What time is it",
           "count": 1
         },
         {
           "said": "I am cold",
-          "predicted": "Call my family",
+          "predicted": "I am hot",
           "count": 1
         },
         {
           "said": "I am cold",
-          "predicted": "I cannot breathe",
+          "predicted": "Thank you",
+          "count": 1
+        },
+        {
+          "said": "I am hot",
+          "predicted": "I am scared",
+          "count": 1
+        },
+        {
+          "said": "I am hot",
+          "predicted": "I need the toilet",
+          "count": 1
+        },
+        {
+          "said": "I am scared",
+          "predicted": "I feel sick",
+          "count": 1
+        },
+        {
+          "said": "I am scared",
+          "predicted": "I am hot",
+          "count": 1
+        },
+        {
+          "said": "I cannot breathe",
+          "predicted": "I need the toilet",
           "count": 1
         }
       ]

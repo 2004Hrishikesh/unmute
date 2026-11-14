@@ -10,10 +10,12 @@ const MIN_FRAMES = 8;
 
 let PH = null, counts = {}, current = null, lastIndex = -1, busy = false, ready = false;
 
-const userInput = $("#userInput"), setSelect = $("#setSelect"), targetSelect = $("#targetSelect");
+const userInput = $("#userInput"), setSelect = $("#setSelect"), targetSelect = $("#targetSelect"), orderSelect = $("#orderSelect");
 userInput.value = settings.user;
 setSelect.value = settings.get("enrollSet", "demo");
-targetSelect.value = String(settings.get("enrollTarget", 4));
+targetSelect.value = String(settings.get("enrollTarget", 6));
+orderSelect.value = settings.get("enrollOrder", "block");
+orderSelect.addEventListener("change", () => { settings.set("enrollOrder", orderSelect.value); pickNext(); render(); });
 userInput.addEventListener("change", () => { settings.user = userInput.value.trim().toLowerCase(); loadCounts(); });
 setSelect.addEventListener("change", () => { settings.set("enrollSet", setSelect.value); pickNext(); render(); });
 targetSelect.addEventListener("change", () => { settings.set("enrollTarget", +targetSelect.value); pickNext(); render(); });
@@ -31,11 +33,17 @@ async function loadCounts() {
   pickNext(); render();
 }
 
-// Round-robin: the phrase with the fewest samples, continuing after the last one recorded.
+// "block": stay on the same phrase until it has enough samples (people mouth it the same way when the
+// previous attempt is fresh). "mixed": round-robin, the phrase with the fewest samples next.
 function pickNext(skip = false) {
   const list = phraseList();
   const need = list.filter((p) => (counts[p] || 0) < target());
   if (!need.length) { current = null; return; }
+  if (orderSelect.value === "block" && !skip) {
+    if (current && need.includes(current)) return;
+    const n = list.length;
+    for (let k = 1; k <= n; k++) { const p = list[(lastIndex + k) % n]; if (need.includes(p)) { current = p; lastIndex = list.indexOf(p); return; } }
+  }
   const minC = Math.min(...need.map((p) => counts[p] || 0));
   const n = list.length;
   for (let k = 1; k <= n; k++) {
@@ -88,15 +96,15 @@ const ptr = new PushToRecord({
       counts[said] = (counts[said] || 0) + 1;
       beep(1046, 90, 0.12);
       const c = r.check;
-      if (c && !c.matches) {
-        // Inconsistent samples are the main cause of wrong guesses later: offer to redo it now.
+      if (c && !c.in_top3) {
+        // Clearly unlike this person's other samples of the phrase. Don't nag: explain, and let them choose.
         msgEl.innerHTML = `<span class="check-warn"></span>`;
-        msgEl.firstChild.textContent = `Saved, but this “${said}” looked more like “${c.looks_like}”. `
-          + `Click “Redo last” and mouth it the same way as before: same speed, bigger lips.`;
+        msgEl.firstChild.textContent = `Saved. This “${said}” looked more like “${c.looks_like}” than like your other `
+          + `${c.others} samples of it. If that was a slip, click “Redo last”; otherwise keep going and mouth the two phrases differently.`;
       } else {
         msgEl.innerHTML = `<span class="flash-ok"></span>`;
         msgEl.firstChild.textContent = `Saved “${said}” (${rec.frames.length} frames, ${rec.secs.toFixed(1)}s)`
-          + (c ? " · matches your other samples ✓" : "");
+          + (c ? (c.matches ? " · matches your other samples ✓" : " · close to your other samples") : "");
       }
       pickNext(); render();
     } catch (e) {
