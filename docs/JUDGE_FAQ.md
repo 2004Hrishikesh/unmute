@@ -15,8 +15,8 @@ prediction. For a bedside tool with 10 to 20 phrases per patient, that trade is 
 
 **3. A sick patient can't sit through calibration. So how does this work in real life?**
 They don't have to. A new patient starts on the shared starter model: Unmute matches against every recording on the
-laptop, not just their own. Measured: the right sentence was in the three cards 94% of the time for a team member
-matched only against another member's recordings of the 10 demo phrases (69% first time; chance 30% / 10%).
+laptop, not just their own. Measured: the right sentence was in the three cards 90.2% of the time for a team member
+matched only against another member's recordings of the 10 demo phrases (70.6% first time; chance 30% / 10%).
 Then every sentence the patient confirms is saved as a personal sample, so the model becomes theirs just from use:
 starter plus 2 personal samples per phrase measured 98% top-3. A nurse can also do a 2-minute "quick start" of the
 5 urgent phrases plus Yes/No, holding the button for the patient.
@@ -28,15 +28,16 @@ confirmation is by nod, button, or blink, it works offline, and urgent requests 
 a fixed list of about 40 phrases, one model for everyone, and needs a connection.
 
 **5. What is the accuracy, and how did you measure it?**
-Leave-one-out per person: each calibration recording is held out and matched against that person's other
-recordings. On 80 recordings from two people, 10 phrases each: 47.5% top-1 and 73.8% top-3 overall; the best
-person is at 75% top-1 and 95% top-3. Chance is 10% and 30%. Measured 14 November 2026, shown on the Proof page.
+Leave-one-out: each recording is held out and matched against the others. kesh, all 20 phrases, 5–6 samples each:
+81.4% top-1 and 91.2% top-3 (chance 5% / 15%). rishi, 10 phrases, 4 each: 75.0% / 95.0% (chance 10% / 30%).
+Overall 79.6% / 92.2% on 142 recordings. Measured 14 November 2026, live on the Proof page.
 
-**6. Why only 47.5%?**
-Two reasons. First, the settings were tuned on these same 80 recordings, so even that number is optimistic.
-Second, one person's recordings of the same phrase vary a lot; the same recogniser gets 75% on the other person.
-Calibration now warns when a recording doesn't match the previous ones. The number that matters at the bedside is
-top-3, because the patient picks from three cards: 74% overall, 95% for the best person.
+**6. Why not higher, and what moved the number?**
+Earlier today a first 80-recording set scored 47.5% top-1, and one person's recordings of the same phrase varied
+a lot. The recogniser settings were tuned on that set (so that number was optimistic), the Calibrate page was
+changed to record the samples of a phrase in a row and to warn when one looks like a different phrase, and kesh's
+102 new recordings under those rules measure 81.4% top-1. The number that matters at the bedside is top-3, because
+the patient picks from three cards: 92.2% overall.
 
 **7. What about patients who can't nod, or can't press anything at all?**
 Settings offers three confirm methods. Nod and shake. Button or switch: the cards light up one by one and a press

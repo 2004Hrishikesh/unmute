@@ -110,7 +110,7 @@ Open **Settings**, change the name to a new one, e.g. `judge`. Mouth **"I need w
 
 > "This person has never calibrated. Unmute matches against everyone's recordings on this laptop: the shared
 > starter model. And every sentence they confirm is saved as their own sample, so it becomes personal just from
-> use. Measured: a new person got the right sentence in the three cards 94% of the time on the demo phrases."
+> use. Measured: a new person got the right sentence in the three cards 90.2% of the time on the demo phrases."
 
 Confirm it. Point at "Starter model (no calibration yet)" under the cards. Change the name back.
 
@@ -119,8 +119,8 @@ Confirm it. Point at "Starter model (no calibration yet)" under the cards. Chang
 Click **Proof**.
 
 > "These are measured numbers from our own recordings, leave-one-out. Right now the correct sentence is in the
-> three cards 95% of the time for me, and [read the overall top-3 number from the Proof page] across all of us.
-> Across the hackathon we took the recogniser from
+> three cards 95% of the time for me, 91.2% for my teammate across all 20 phrases, and 92.2% overall
+> [re-check the Proof page]. Across the hackathon we took the recogniser from
 > 19% to 47% top-1 by fixing normalisation, adding lip velocity, and correcting for short phrases that soak up
 > wrong answers. These settings were tuned on the same recordings, so we expect lower numbers on new people until
 > we re-measure. We only show what we measured."

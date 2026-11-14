@@ -51,10 +51,10 @@ This was our biggest worry: a sick patient can't be asked to record 40 phrases. 
 and all three are measured on our own recordings (Proof page, "Shared starter model"):
 
 1. **Zero calibration: the shared starter model.** Unmute matches against *everyone's* recordings on the laptop,
-   not just the patient's own. A brand-new person gets the right sentence first time 69% and in the three cards
-   94% of the time when matched only against another team member's recordings of the 10 demo phrases (kesh, 16
-   recordings; chance 10% / 30%). The other way round, against a 20-phrase set, it is 35% / 60% (rishi, 40
-   recordings; chance 5% / 15%). Not perfect, but the patient can start talking in the first minute, with no setup.
+   not just the patient's own. A brand-new person gets the right sentence first time 70.6% and in the three cards
+   90.2% of the time when matched only against another team member's recordings of the 10 demo phrases (kesh,
+   51 recordings; chance 10% / 30%). The other way round, against a 20-phrase set, it is 42.5% / 75.0%
+   (rishi, 40 recordings; chance 5% / 15%). Not perfect, but the patient can start talking in the first minute, with no setup.
 2. **It learns from use.** Every sentence the patient confirms (nod, button, blink) is saved as a personal sample of
    that phrase. No calibration session, just use. In a measured experiment, the starter model plus 2 personal samples
    per phrase reached 68% top-1 and 98% top-3 on rishi's remaining recordings; 1 personal sample gave 58% / 86%.
@@ -97,41 +97,48 @@ it, and gets better the more they use it. We do not claim Unmute is more accurat
 
 ## Measured results
 
-Leave-one-out per person: each calibration recording is held out and matched against the same person's other
-recordings. Nothing here is estimated. Measured on 14 November 2026. Chance is 10% top-1 and 30% top-3.
+Leave-one-out: each recording is held out and matched against the others. Nothing here is estimated. Measured on
+14 November 2026 at 17:49, and live on the Proof page.
 
-| Person | Samples | Phrases | Top-1 | Top-3 (correct sentence among the 3 cards) |
-| --- | --- | --- | --- | --- |
-| rishi | 40 | 10 | 75.0% | 95.0% |
-| pankaj | 40 | 10 | 20.0% | 52.5% |
-| **all** | 80 | 10 | 47.5% | 73.8% |
+| Person | Samples | Phrases | Top-1 | Top-3 (correct sentence among the 3 cards) | Chance top-1 / top-3 |
+| --- | --- | --- | --- | --- | --- |
+| kesh | 102 | 20 | 81.4% | 91.2% | 5.0% / 15.0% |
+| rishi | 40 | 10 | 75.0% | 95.0% | 10.0% / 30.0% |
+| **all** | 142 | | 79.6% | 92.2% | |
 
-How the recogniser improved during the hackathon, on the same 80 recordings:
+kesh recorded all 20 phrases, 5–6 samples each, same phrase in a row. rishi recorded the 10-phrase demo set, 4 each.
 
-| Change | Top-1 | Top-3 |
-| --- | --- | --- |
-| First settings | 18.8% | 35.0% |
-| + centre each recording on its own mean, add velocity, trim still frames, lip points only | 40.0% | 66.2% |
-| + hubness correction (stops short phrases like "Yes" soaking up wrong answers) | 47.5% | 73.8% |
+Shared starter model (same recordings, Proof page "Shared starter model"):
+
+| Person | As deployed (held out of the pooled recordings) top-1 / top-3 | No calibration (other people's recordings only) top-1 / top-3 | Chance |
+| --- | --- | --- | --- |
+| kesh | 77.5% / 92.2% | 70.6% / 90.2% (51 samples, 10 phrases) | 10.0% / 30.0% |
+| rishi | 70.0% / 97.5% | 42.5% / 75.0% (40 samples, 20 phrases) | 5.0% / 15.0% |
+
+Earlier the same day, on a first 80-recording set (rishi and a team member whose recordings were later deleted
+for re-calibration), the recogniser improved from 18.8% to 47.5% top-1 (35.0% to 73.8% top-3) by centring each
+recording on its own mean, adding lip velocity, trimming still frames, and correcting for short phrases that soak
+up wrong answers. That team member's recordings of the same phrase differed a lot from each other; the Calibrate
+page now records the samples of a phrase in a row and warns when one looks like a different phrase, and kesh's
+81% with that procedure is the result.
+
+More samples per phrase help, measured on rishi: 2 per phrase 51% top-1, 3 gave 64%, 4 gave 75%. Starter model
+plus 2 personal samples per phrase (one person's recordings as the starter): 68% top-1, 98% top-3.
 
 Caveats, said out loud:
 
-- These settings were chosen using these same 80 recordings, so the numbers are optimistic until they are
-  re-measured on new recordings.
-- The gap between rishi and pankaj is real. pankaj's recordings of the same phrase differ a lot from each other.
-  Calibration now warns about this while recording, and a recording where the lips barely moved is rejected.
+- The recogniser settings were chosen on the first 80 recordings; kesh's 102 are new recordings under those
+  settings, which is the fairer number.
+- Two people so far. The starter-model numbers depend on who recorded what: 71% / 90% for one person, 43% / 75%
+  for the other.
 - Gemini's benefit with real bedside context has not been measured. In the leave-one-out test there is no care note
   and no history, and Gemini kept the lip-reading order in every call it answered. That shows it does not make lip
   reading worse without context.
-- A third person, kesh, is still calibrating (26 usable recordings of 13 phrases so far, 1–2 per phrase, which is
-  too few to judge his personal model). His recordings are what the starter-model numbers above were measured with.
-- The "starter + 2 personal samples" numbers come from one person (rishi) with one other person's recordings as
-  the starter. More people are needed before that is a general claim.
 
 ## Honest limitations
 
 - **The starter model is small.** It is built from the people who have used this laptop (two team members today).
-  Its measured accuracy for a new person ranges from 35% to 69% top-1 depending on who recorded what. More
+  Its measured accuracy for a new person ranges from 42.5% to 70.6% top-1 depending on who recorded what. More
   volunteers make it better; that is a recording session, not a research project.
 - **Best fit is a free mouth.** A patient with a breathing tube *through the mouth* can barely move their lips.
   Unmute suits tracheostomy patients, patients just after extubation, and laryngectomy patients.
