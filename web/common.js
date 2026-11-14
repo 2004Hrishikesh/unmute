@@ -83,12 +83,12 @@ export function cameraHelp(e) {
   if (!window.isSecureContext)
     return "The browser only allows the camera on http://localhost:8000. Open that address (not a file:// or network IP).";
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
-    return "This browser window can't use cameras. Open http://localhost:8000 in Google Chrome.";
+    return "This browser window can't use cameras. Open http://localhost:8000 in Brave or Chrome.";
   const n = e && e.name;
   if (n === "NotAllowedError" || n === "SecurityError")
-    return "Camera permission is blocked. 1) Use Google Chrome, not the Claude app's preview pane. " +
+    return "Camera permission is blocked. 1) Use Brave or Chrome, not the Claude app's preview pane. " +
       "2) Click the camera icon in the address bar, choose Allow, then Retry. " +
-      "3) On a Mac: System Settings → Privacy & Security → Camera → turn on Google Chrome, then quit and reopen Chrome.";
+      "3) On a Mac: System Settings → Privacy & Security → Camera → turn on Brave (or Chrome), then quit and reopen it.";
   if (n === "NotFoundError" || n === "OverconstrainedError")
     return "No camera found. Pick another camera from the list, or check that the webcam is connected.";
   if (n === "NotReadableError" || n === "AbortError" || n === "TrackStartError")
