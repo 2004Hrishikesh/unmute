@@ -1,7 +1,7 @@
 // Patient view: mouth -> 3 choices -> nod to confirm -> speak (+ nurse alert if urgent).
 import {
   $, api, settings, createLandmarker, CameraControl, FaceTracker, drawMouth, PushToRecord,
-  GestureDetector, LongBlink, LipActivity, tapMode, autoMode, BrightnessCheck, speak, alarm, unlockAudio, beep, localTimeString,
+  GestureDetector, LongBlink, AutoRecorder, tapMode, BrightnessCheck, speak, alarm, unlockAudio, beep, localTimeString,
 } from "/common.js";
 
 const video = $("#video"), overlay = $("#overlay"), cam = $("#cam");
@@ -18,7 +18,6 @@ let calibrated = false, calInfo = null, lastRec = null;
 let lastFrame = null;
 let urgentId = null, urgentPoll = null;
 let spokenTimer = null;
-let URGENT = [], possibleId = null, autoTimer = null;
 
 // ---------------------------------------------------------------- settings UI
 
@@ -39,34 +38,42 @@ const blinker = new LongBlink({ holdMs: 800 });
 let scanMs = 2500;
 bindRange("scanS", "scanS", 2.5, (v) => (scanMs = v * 1000));
 bindRange("blinkS", "blinkS", 0.8, (v) => (blinker.holdMs = v * 1000));
-// Hands-free: lips moving starts the recording, lips resting stops it, and (optionally) the top card is spoken
-// after a countdown unless the patient nods / shakes / presses / mouths again.
-const lipAct = new LipActivity();
-let autoS = 4;
-bindRange("lipSens", "lipSens", 2.5, (v) => (lipAct.startT = v / 1000));
-bindRange("autoS", "autoS", 4, (v) => (autoS = v));
-const earlyPing = $("#earlyPing");
-earlyPing.checked = settings.get("earlyPing", true);
-earlyPing.addEventListener("change", () => settings.set("earlyPing", earlyPing.checked));
-function startAutoConfirm() {
-  stopAutoConfirm();
-  if (!autoMode() || mode() !== "nod" || !(autoS > 0)) return;
-  autoTimer = setTimeout(() => { if (state === "choosing") confirm(selected, "auto"); }, autoS * 1000);
-}
-function stopAutoConfirm() { clearTimeout(autoTimer); autoTimer = null; }
 const confirmSel = $("#confirmMode"), recordSel = $("#recordMode");
 confirmSel.value = settings.get("confirmMode", "nod");
 recordSel.value = settings.get("recordMode", "hold");
 const mode = () => confirmSel.value;
 function applyMode() {
-  document.querySelectorAll(".nod-only").forEach((e) => e.classList.toggle("hidden", mode() !== "nod"));
+  document.querySelectorAll(".auto-only").forEach((e) => e.classList.toggle("hidden", !autoMode()));
+  document.querySelectorAll(".nod-only").forEach((e) => e.classList.toggle("hidden", mode() !== "nod" || (e.classList.contains("auto-only") && !autoMode())));
   document.querySelectorAll(".scan-only").forEach((e) => e.classList.toggle("hidden", mode() === "nod"));
   document.querySelectorAll(".blink-only").forEach((e) => e.classList.toggle("hidden", mode() !== "blink"));
-  document.querySelectorAll(".auto-only").forEach((e) => e.classList.toggle("hidden", !autoMode()));
-  if (state === "choosing") { startScan(); renderChoices(); } else if (["idle", "spoken"].includes(state)) setState(state === "spoken" ? "idle" : state);
+  if (state === "choosing") { startScan(); startAutoConfirm(); renderChoices(); } else if (["idle", "spoken"].includes(state)) setState("idle", { msg: idleMsg() });
 }
 confirmSel.addEventListener("change", () => { settings.set("confirmMode", confirmSel.value); applyMode(); });
-recordSel.addEventListener("change", () => { settings.set("recordMode", recordSel.value); applyMode(); lipAct.reset(); if (state === "idle") setState("idle", { msg: idleMsg() }); });
+recordSel.addEventListener("change", () => { settings.set("recordMode", recordSel.value); applyMode(); });
+const autoMode = () => recordSel.value === "auto";
+
+// Hands-free: the lips starting to move begins the recording; stillness ends it. Then the first card can
+// speak by itself after a countdown unless the patient shakes, blinks long, presses anything, or nods sooner.
+let autoConfirmMs = 4000;
+bindRange("autoConfirmS", "autoConfirmS", 4, (v) => (autoConfirmMs = v * 1000));
+const auto = new AutoRecorder({
+  enabled: () => autoMode() && calibrated && ["idle", "spoken"].includes(state),
+  onStart: (preroll) => { ptr.begin(); for (const f of preroll) ptr.push(f); },
+  onStop: ({ tooShort, lostFace }) => {
+    if (!ptr.recording) return;
+    if (tooShort || lostFace) { ptr.cancel(); setState("idle", { msg: lostFace ? "I lost your face. Face the camera." : idleMsg() }); return; }
+    ptr.end();
+  },
+});
+bindRange("sens", "sens", 6, (v) => (auto.sensitivity = v));
+let autoTimer = null;
+function startAutoConfirm() {
+  stopAutoConfirm();
+  if (!autoMode() || mode() !== "nod" || autoConfirmMs <= 0 || state !== "choosing") return;
+  autoTimer = setTimeout(() => { if (state === "choosing") confirm(selected, "auto"); }, autoConfirmMs);
+}
+function stopAutoConfirm() { clearTimeout(autoTimer); autoTimer = null; }
 
 let scanTimer = null;
 function startScan() {
@@ -81,7 +88,7 @@ function startScan() {
 }
 function stopScan() { clearTimeout(scanTimer); scanTimer = null; }
 function recordHint() {
-  if (autoMode()) return "Hands-free: just mouth the sentence. Recording starts and stops by itself.";
+  if (autoMode()) return "Hands-free: just mouth your sentence. Recording starts and stops by itself.";
   return tapMode()
     ? "Press <kbd>Space</kbd> / the button once, mouth the sentence, press again."
     : "Hold <kbd>Space</kbd> (or the button) while you mouth, then let go.";
@@ -156,13 +163,13 @@ function setState(s, extra = {}) {
     subEl.innerHTML = `Nobody has calibrated on this laptop yet. <a href="/enroll.html">Open Calibrate</a> (about a minute).`;
   }
   if (s === "idle") {
-    statusEl.textContent = "Mouth your sentence now";
+    statusEl.textContent = autoMode() ? "Just mouth your sentence" : "Mouth your sentence now";
     subEl.textContent = extra.msg || "";
     hintEl.innerHTML = recordHint();
   }
   if (s === "recording") {
     statusEl.textContent = "Recording…";
-    subEl.textContent = autoMode() ? "Mouth the sentence clearly, then rest your lips." : tapMode() ? "Mouth the sentence clearly, then press again." : "Mouth the sentence clearly, then let go.";
+    subEl.textContent = autoMode() ? "Keep going; it stops when your lips stop." : tapMode() ? "Mouth the sentence clearly, then press again." : "Mouth the sentence clearly, then let go.";
   }
   if (s === "thinking") { statusEl.textContent = "Reading your lips…"; subEl.textContent = ""; }
   if (s === "choosing") renderChoices();
@@ -178,7 +185,7 @@ function setState(s, extra = {}) {
 function renderChoices() {
   statusEl.textContent = "Did you say…";
   subEl.textContent = {
-    nod: autoMode() && autoS > 0 ? `Nod to confirm now, shake for the next one, or mouth it again. The top one is spoken by itself in ${autoS} s.` : "Nod to confirm · shake your head for the next one",
+    nod: autoMode() && autoConfirmMs > 0 ? "Nod to confirm now · shake for the next one · or wait and the first card speaks by itself" : "Nod to confirm · shake your head for the next one",
     switch: "Press the button when the right one lights up",
     blink: "Close your eyes for a moment when the right one lights up",
   }[mode()];
@@ -192,15 +199,12 @@ function renderChoices() {
       b.innerHTML = `<span class="num">${i + 1}</span><span></span>`;
       b.children[1].textContent = c;
     }
-    if (i === selected && mode() !== "nod") {
+    const countdown = mode() !== "nod" ? scanMs * (performance.now() - choiceShownAt < 300 ? 1.4 : 1)
+      : (autoMode() && autoConfirmMs > 0 ? autoConfirmMs : 0);
+    if (i === selected && countdown > 0) {
       const bar = document.createElement("span");
       bar.className = "scanbar";
-      bar.style.animationDuration = `${scanMs * (performance.now() - choiceShownAt < 300 ? 1.4 : 1)}ms`;
-      b.appendChild(bar);
-    } else if (i === selected && autoMode() && autoS > 0) {
-      const bar = document.createElement("span");
-      bar.className = "scanbar";
-      bar.style.animationDuration = `${autoS * 1000}ms`;
+      bar.style.animationDuration = `${countdown}ms`;
       b.appendChild(bar);
     }
     b.addEventListener("click", () => confirm(i, "click"));
@@ -217,7 +221,7 @@ function moveSelection(delta, auto = false) {
   beep(auto ? 520 : 660, 60, auto ? 0.06 : 0.12);
   renderChoices();
   if (!auto) startScan(); // a manual move restarts the scan clock
-  startAutoConfirm();     // and the hands-free countdown
+  startAutoConfirm(); // and the hands-free countdown
 }
 
 // ---------------------------------------------------------------- record -> predict
@@ -225,7 +229,7 @@ function moveSelection(delta, auto = false) {
 const ptr = new PushToRecord({
   button: recordBtn,
   // In switch mode the same button picks a choice, so it must not start a recording while choosing.
-  enabled: () => calibrated && (["idle", "spoken"].includes(state) || (state === "choosing" && (mode() === "nod" || autoMode())) || state === "recording"),
+  enabled: () => calibrated && (["idle", "spoken"].includes(state) || (state === "choosing" && mode() === "nod") || state === "recording"),
   onStart: () => { speechSynthesis.cancel(); clearTimeout(spokenTimer); setState("recording"); },
   onStop: (rec) => onRecorded(rec),
 });
@@ -255,7 +259,6 @@ async function onRecorded(rec) {
     setState("choosing");
     startScan();
     startAutoConfirm();
-    pingIfUrgent(r);
     if (r.mode === "gemini" && r.reason) reasonEl.textContent = "Context: " + r.reason;
     if (r.mode === "offline" && r.reason) reasonEl.textContent = "Offline mode: " + r.reason;
     if (r.source === "starter") reasonEl.textContent = "Starter model (no calibration yet). " + reasonEl.textContent;
@@ -265,26 +268,12 @@ async function onRecorded(rec) {
   }
 }
 
-// Before confirmation: if the best guess is urgent, tell the nurse now ("possible, not yet confirmed").
-// The confirmed sentence that follows supersedes it on the nurse page; a false alarm costs the nurse a glance.
-async function pingIfUrgent(r) {
-  possibleId = null;
-  const top = r.choices && r.choices[0];
-  if (!earlyPing.checked || !top || !URGENT.includes(top)) return;
-  try {
-    const row = await api("/api/log", { body: { user: settings.user, sentence: top, method: "possible", mode: lastMode, confirmed: false, learn: false } });
-    possibleId = row.id;
-    reasonEl.textContent = `Nurse alerted: possible "${top}" (not yet confirmed). ` + reasonEl.textContent;
-  } catch (e) { console.warn("early alert failed", e); }
-}
-
 async function confirm(i, method) {
   if (state !== "choosing") return;
   const opts = choices.concat([RETRY]);
   const sentence = opts[i];
   if (sentence === undefined) return;
   if (sentence === RETRY) { setState("idle", { msg: "OK, try again." }); return; }
-  stopAutoConfirm();
   speak(sentence);
   setState("spoken", { sentence });
   spokenTimer = setTimeout(() => state === "spoken" && setState("idle", { msg: idleMsg() }), 6000);
@@ -334,6 +323,7 @@ window.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
   unlockAudio();
   if (state !== "choosing") return;
+  if (autoTimer && !["1", "2", "3", "Enter"].includes(e.key)) { stopAutoConfirm(); renderChoices(); } // any other key = "wait, not that"
   if (mode() === "switch" && (e.code === "Space" || e.key === "Enter") && !e.repeat) {
     e.preventDefault(); confirm(selected, "switch"); return;
   }
@@ -349,17 +339,11 @@ window.addEventListener("keydown", (e) => {
 function onFrame(frame, ts) {
   lastFrame = frame;
   drawMouth(overlay, video, frame, state === "recording" ? "#f87171" : "#5eead4");
+  auto.push(frame, ts);
   ptr.push(frame);
   if (!frame) camMsg.textContent = "Face the camera";
-  else camMsg.textContent = state === "recording" ? "Recording" : "Tracking your lips";
+  else camMsg.textContent = state === "recording" ? (autoMode() ? "Lips moving: recording" : "Recording") : (autoMode() ? "Listening to your lips" : "Tracking your lips");
   camMsg.classList.toggle("hidden", !!frame && state !== "recording");
-
-  if (autoMode() && calibrated && ["idle", "spoken", "choosing", "recording"].includes(state)) {
-    const lips = frame ? frame.feat.slice(frame.dims.bs) : null;
-    const ev = lipAct.update(lips, ts);
-    if (ev === "start" && state !== "recording") ptr.begin();   // mouthing again while choosing = try again
-    else if (ev === "stop" && state === "recording") ptr.end();
-  }
 
   if (frame && state === "choosing" && performance.now() - choiceShownAt > 600) {
     if (mode() === "nod") {
@@ -369,6 +353,7 @@ function onFrame(frame, ts) {
     } else if (mode() === "blink") {
       const wasClosed = blinker.closed;
       if (blinker.update(frame.blink, ts) === "blink") { beep(988, 120, 0.15); confirm(selected, "blink"); }
+      else if (blinker.closed && autoTimer) stopAutoConfirm();
       else if (blinker.closed !== wasClosed || blinker.closed) {
         const sel = choicesEl.querySelector(".choice.selected");
         if (sel) sel.style.setProperty("--blink", blinker.progress.toFixed(2));
@@ -383,7 +368,7 @@ function renderDebug(pred) {
   if (pred) lastPred = pred;
   const f = lastFrame, d = gest.last || { dp: 0, dy: 0 };
   const lines = [
-    `fps ${tracker ? tracker.fps : 0}   brightness ${bright && bright.value != null ? bright.value.toFixed(0) : "-"}   lip energy ${(lipAct.energy * 1000).toFixed(2)} (start at ${(lipAct.startT * 1000).toFixed(2)})`,
+    `fps ${tracker ? tracker.fps : 0}   brightness ${bright && bright.value != null ? bright.value.toFixed(0) : "-"}`,
     `head Δpitch ${d.dp.toFixed(1)}°  Δyaw ${d.dy.toFixed(1)}°   jawOpen ${f ? f.jawOpen.toFixed(2) : "-"}   eyesClosed ${f ? f.blink.toFixed(2) : "-"}`,
   ];
   if (lastPred) {
@@ -399,7 +384,6 @@ setInterval(() => $("#settings").open && renderDebug(), 250);
 let tracker = null, bright = null;
 async function boot() {
   applyMode();
-  try { URGENT = (await api("/api/phrases")).urgent || []; } catch {}
   setState("loading", { msg: "Starting camera and face tracker" });
   refreshStatus();
   // Load the face tracker while the camera starts; they don't depend on each other.
