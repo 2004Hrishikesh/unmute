@@ -42,10 +42,29 @@
             <textarea id="noteInput" placeholder="e.g. post-surgery, cannot eat yet"></textarea>
           </label>
           <label class="row"><input id="geminiToggle" type="checkbox" checked /> Use Gemini re-ranking with bedside context</label>
-          <label>Nod threshold (degrees): <span id="pitchTVal"></span>
+          <label>How does the patient confirm a choice?
+            <select id="confirmMode">
+              <option value="nod">Nod (shake = next)</option>
+              <option value="switch">Button / switch: choices light up one by one, press to pick</option>
+              <option value="blink">Long blink: choices light up one by one, close eyes to pick</option>
+            </select>
+          </label>
+          <label>How to record
+            <select id="recordMode">
+              <option value="hold">Hold the button / Space while mouthing</option>
+              <option value="tap">Tap once to start, tap again to stop</option>
+            </select>
+          </label>
+          <label class="scan-only">Time on each choice (seconds): <span id="scanSVal"></span>
+            <input id="scanS" type="range" min="1" max="6" step="0.5" />
+          </label>
+          <label class="blink-only">Long blink length (seconds): <span id="blinkSVal"></span>
+            <input id="blinkS" type="range" min="0.5" max="2" step="0.1" />
+          </label>
+          <label class="nod-only">Nod threshold (degrees): <span id="pitchTVal"></span>
             <input id="pitchT" type="range" min="3" max="20" step="1" />
           </label>
-          <label>Shake threshold (degrees): <span id="yawTVal"></span>
+          <label class="nod-only">Shake threshold (degrees): <span id="yawTVal"></span>
             <input id="yawT" type="range" min="4" max="30" step="1" />
           </label>
           <label>Darkness threshold (0–255): <span id="darkTVal"></span>

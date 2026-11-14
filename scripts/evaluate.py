@@ -35,13 +35,14 @@ def main():
     if args.sweep:
         configs = [
             Config(),
-            Config(k=1),
-            Config(deltas=True),
-            Config(window=4),
+            Config(k=2),
+            Config(trim=False),
+            Config(center=False),
+            Config(deltas=False),
+            Config(bs_weight=1.0),
+            Config(length=40),
             Config(window=10),
-            Config(bs_weight=1.5, lip_weight=0.5),
-            Config(bs_weight=0.5, lip_weight=1.5),
-            Config(length=30),
+            Config(length=40, k=2, deltas=False, center=False, trim=False, bs_weight=1.0),  # original
         ]
         print(f"{'config':70s} top1   top3")
         for c in configs:

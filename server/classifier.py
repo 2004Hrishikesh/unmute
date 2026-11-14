@@ -15,11 +15,15 @@ from . import features as F
 
 @dataclass
 class Config:
-    length: int = F.DEFAULT_LEN   # frames after resampling
+    # Defaults chosen by leave-one-out on the team's own recordings (scripts/evaluate.py --sweep).
+    length: int = 30              # frames after resampling
     window: int = 6               # Sakoe-Chiba band half-width (frames)
-    k: int = 2                    # best-k distances per phrase
-    deltas: bool = False          # append frame-to-frame velocity
-    bs_weight: float = 1.0
+    k: int = 1                    # best-k distances per phrase
+    deltas: bool = True           # append frame-to-frame velocity
+    delta_scale: float = 3.0
+    center: bool = True           # subtract each recording's own mean (removes resting-lip drift)
+    trim: bool = True             # drop still frames at the start and end
+    bs_weight: float = 0.0        # blendshapes were noisier than lip points in our data
     lip_weight: float = 1.0
 
     def as_dict(self):
@@ -56,21 +60,29 @@ class Recogniser:
         D = len(self.samples[0]["frames"][0])
         self.samples = [s for s in self.samples if len(s["frames"][0]) == D]
         self.dims = self.samples[0].get("dims", {"bs": 0})
-        raw = [F.to_array(s["frames"]) for s in self.samples]
+        raw = [self._clean(F.to_array(s["frames"])) for s in self.samples]
         self.mean, self.std = F.fit_stats(raw)
         self.weights = F.group_weights(self.dims, D, self.cfg.bs_weight, self.cfg.lip_weight)
         self.phrases = [s["phrase"] for s in self.samples]
         self.templates = np.stack([self._prep(r) for r in raw])
 
+    def _clean(self, arr: np.ndarray) -> np.ndarray:
+        n_bs = int(self.dims.get("bs", 0))
+        if self.cfg.trim:
+            arr = F.trim_still(arr, n_bs)
+        if self.cfg.center:
+            arr = arr - arr.mean(axis=0)
+        return arr
+
     def _prep(self, arr: np.ndarray) -> np.ndarray:
         x = (arr - self.mean) / self.std * self.weights
         x = F.resample(x, self.cfg.length)
         if self.cfg.deltas:
-            x = F.add_deltas(x)
+            x = np.concatenate([x, np.gradient(x, axis=0) * self.cfg.delta_scale], axis=1)
         return x
 
     def distances(self, frames, exclude: int | None = None) -> np.ndarray:
-        q = self._prep(F.to_array(frames))
+        q = self._prep(self._clean(F.to_array(frames)))
         d = dtw_batch(q, self.templates, self.cfg.window)
         if exclude is not None:
             d[exclude] = np.inf

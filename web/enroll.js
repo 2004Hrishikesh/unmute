@@ -1,7 +1,7 @@
 // Calibration: record each phrase a few times for the current user.
 import {
   $, api, settings, createLandmarker, CameraControl, FaceTracker, drawMouth, PushToRecord,
-  BrightnessCheck, beep, unlockAudio,
+  BrightnessCheck, beep, unlockAudio, tapMode,
 } from "/common.js";
 
 const video = $("#video"), overlay = $("#overlay"), cam = $("#cam"), camMsg = $("#camMsg");
@@ -83,10 +83,21 @@ const ptr = new PushToRecord({
     }
     busy = true;
     try {
-      await api("/api/enroll", { body: { user: settings.user, phrase: current, frames: rec.frames, dims: rec.dims, fps: rec.fps } });
-      counts[current] = (counts[current] || 0) + 1;
+      const said = current;
+      const r = await api("/api/enroll", { body: { user: settings.user, phrase: said, frames: rec.frames, dims: rec.dims, fps: rec.fps } });
+      counts[said] = (counts[said] || 0) + 1;
       beep(1046, 90, 0.12);
-      msgEl.innerHTML = `<span class="flash-ok">Saved “${current}” (${rec.frames.length} frames, ${rec.secs.toFixed(1)}s)</span>`;
+      const c = r.check;
+      if (c && !c.matches) {
+        // Inconsistent samples are the main cause of wrong guesses later: offer to redo it now.
+        msgEl.innerHTML = `<span class="check-warn"></span>`;
+        msgEl.firstChild.textContent = `Saved, but this “${said}” looked more like “${c.looks_like}”. `
+          + `Click “Redo last” and mouth it the same way as before: same speed, bigger lips.`;
+      } else {
+        msgEl.innerHTML = `<span class="flash-ok"></span>`;
+        msgEl.firstChild.textContent = `Saved “${said}” (${rec.frames.length} frames, ${rec.secs.toFixed(1)}s)`
+          + (c ? " · matches your other samples ✓" : "");
+      }
       pickNext(); render();
     } catch (e) {
       msgEl.innerHTML = `<span class="flash-bad">Save failed: ${e.message}</span>`;
@@ -113,7 +124,7 @@ async function boot() {
   let lmReady = false;
   const camera = new CameraControl({
     video, after: cam, msgEl: camMsg,
-    onReady: () => { ready = lmReady; msgEl.innerHTML = "Hold <kbd>Space</kbd> (or the button), mouth the phrase, let go."; render(); },
+    onReady: () => { ready = lmReady; msgEl.innerHTML = tapMode() ? "Press <kbd>Space</kbd> (or the button), mouth the phrase, press again." : "Hold <kbd>Space</kbd> (or the button), mouth the phrase, let go."; render(); },
     onError: (help) => { ready = false; msgEl.innerHTML = `<span class="flash-bad"></span>`; msgEl.firstChild.textContent = help; render(); },
   });
   await camera.start();

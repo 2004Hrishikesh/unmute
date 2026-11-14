@@ -1,0 +1,247 @@
+{
+  "generated_at": "2026-11-14 15:13:14",
+  "method": "leave-one-out, per user (each sample is matched only against that user's other samples)",
+  "config": {
+    "length": 30,
+    "window": 6,
+    "k": 1,
+    "deltas": true,
+    "delta_scale": 3.0,
+    "center": true,
+    "trim": true,
+    "bs_weight": 0.0,
+    "lip_weight": 1.0
+  },
+  "with_gemini": false,
+  "overall": {
+    "samples": 80,
+    "top1": 0.4,
+    "top3": 0.6625
+  },
+  "users": {
+    "pankaj": {
+      "samples": 40,
+      "phrases": 10,
+      "top1": 0.2,
+      "top3": 0.5,
+      "chance_top1": 0.1,
+      "chance_top3": 0.3,
+      "per_phrase": {
+        "Call my family": {
+          "n": 4,
+          "top1": 0.25,
+          "top3": 0.75
+        },
+        "Call the nurse": {
+          "n": 4,
+          "top1": 0.0,
+          "top3": 0.75
+        },
+        "I am cold": {
+          "n": 4,
+          "top1": 0.25,
+          "top3": 0.5
+        },
+        "I am in pain": {
+          "n": 4,
+          "top1": 0.5,
+          "top3": 0.75
+        },
+        "I cannot breathe": {
+          "n": 4,
+          "top1": 0.0,
+          "top3": 0.0
+        },
+        "I love you": {
+          "n": 4,
+          "top1": 0.25,
+          "top3": 0.5
+        },
+        "I need water": {
+          "n": 4,
+          "top1": 0.0,
+          "top3": 0.0
+        },
+        "No": {
+          "n": 4,
+          "top1": 0.5,
+          "top3": 0.5
+        },
+        "Thank you": {
+          "n": 4,
+          "top1": 0.0,
+          "top3": 0.5
+        },
+        "Yes": {
+          "n": 4,
+          "top1": 0.25,
+          "top3": 0.75
+        }
+      },
+      "confusions": [
+        {
+          "said": "Call the nurse",
+          "predicted": "Yes",
+          "count": 4
+        },
+        {
+          "said": "I need water",
+          "predicted": "Yes",
+          "count": 3
+        },
+        {
+          "said": "Call my family",
+          "predicted": "Yes",
+          "count": 2
+        },
+        {
+          "said": "I cannot breathe",
+          "predicted": "Yes",
+          "count": 2
+        },
+        {
+          "said": "I love you",
+          "predicted": "Yes",
+          "count": 2
+        },
+        {
+          "said": "Thank you",
+          "predicted": "I am cold",
+          "count": 2
+        },
+        {
+          "said": "Yes",
+          "predicted": "I love you",
+          "count": 2
+        },
+        {
+          "said": "Call my family",
+          "predicted": "I am cold",
+          "count": 1
+        },
+        {
+          "said": "I am cold",
+          "predicted": "I need water",
+          "count": 1
+        },
+        {
+          "said": "I am cold",
+          "predicted": "No",
+          "count": 1
+        }
+      ]
+    },
+    "rishi": {
+      "samples": 40,
+      "phrases": 10,
+      "top1": 0.6,
+      "top3": 0.825,
+      "chance_top1": 0.1,
+      "chance_top3": 0.3,
+      "per_phrase": {
+        "Call my family": {
+          "n": 4,
+          "top1": 0.75,
+          "top3": 0.75
+        },
+        "Call the nurse": {
+          "n": 4,
+          "top1": 1.0,
+          "top3": 1.0
+        },
+        "I am cold": {
+          "n": 4,
+          "top1": 0.0,
+          "top3": 0.5
+        },
+        "I am in pain": {
+          "n": 4,
+          "top1": 1.0,
+          "top3": 1.0
+        },
+        "I cannot breathe": {
+          "n": 4,
+          "top1": 0.5,
+          "top3": 1.0
+        },
+        "I love you": {
+          "n": 4,
+          "top1": 0.75,
+          "top3": 0.75
+        },
+        "I need water": {
+          "n": 4,
+          "top1": 1.0,
+          "top3": 1.0
+        },
+        "No": {
+          "n": 4,
+          "top1": 0.75,
+          "top3": 1.0
+        },
+        "Thank you": {
+          "n": 4,
+          "top1": 0.0,
+          "top3": 0.5
+        },
+        "Yes": {
+          "n": 4,
+          "top1": 0.25,
+          "top3": 0.75
+        }
+      },
+      "confusions": [
+        {
+          "said": "Thank you",
+          "predicted": "Yes",
+          "count": 3
+        },
+        {
+          "said": "I am cold",
+          "predicted": "I need water",
+          "count": 2
+        },
+        {
+          "said": "Yes",
+          "predicted": "No",
+          "count": 2
+        },
+        {
+          "said": "Call my family",
+          "predicted": "Call the nurse",
+          "count": 1
+        },
+        {
+          "said": "I am cold",
+          "predicted": "Thank you",
+          "count": 1
+        },
+        {
+          "said": "I am cold",
+          "predicted": "I love you",
+          "count": 1
+        },
+        {
+          "said": "I cannot breathe",
+          "predicted": "Yes",
+          "count": 1
+        },
+        {
+          "said": "I cannot breathe",
+          "predicted": "I love you",
+          "count": 1
+        },
+        {
+          "said": "I love you",
+          "predicted": "Yes",
+          "count": 1
+        },
+        {
+          "said": "No",
+          "predicted": "Yes",
+          "count": 1
+        }
+      ]
+    }
+  }
+}

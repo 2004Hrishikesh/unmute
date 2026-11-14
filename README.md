@@ -34,8 +34,15 @@ Unmute is a communication aid. It is not a medical device and it does not diagno
 - **Works offline.** If there is no key, no network, or Gemini takes longer than 3 seconds, Unmute uses the
   classifier's top 3 and shows an "offline mode" badge. Speech uses the browser's built-in voices. To load the face
   tracker without internet, run `scripts/fetch_vendor.sh` once.
-- **Confirm by nod.** Nod (pitch down and back within 1.5 s) to confirm the highlighted choice. Shake to move to the next
-  one. Keys `1` `2` `3`, arrows + `Enter`, and mouse clicks also work.
+- **Confirm with whatever movement the patient has** (Settings → "How does the patient confirm"):
+  - **Nod**: pitch down and back within 1.5 s confirms; shake moves to the next choice.
+  - **Button / switch**: the choices light up one by one; one press picks the lit one. Any USB button or
+    assistive "jelly bean" switch that types Space or Enter works, with no driver.
+  - **Long blink**: the same scanning; closing both eyes for about 0.8 s picks. Normal blinks are ignored.
+  - Recording can be "hold while mouthing" or "tap to start, tap to stop", for patients who can't hold a switch.
+  - Carers can always use keys `1` `2` `3`, arrows + `Enter`, or a mouse click.
+- **Calibration quality check.** After each sample, Unmute checks whether it looks like the person's other samples of
+  the same phrase and asks them to redo it if not. Recordings where the lips barely moved are rejected.
 - **Bed-light check.** If the camera image is too dark, the screen says "Turn on the bed light: too dark to read lips".
 
 ## Setup
@@ -45,7 +52,7 @@ Requires Python 3.10+ and Chrome.
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-export GEMINI_API_KEY=...        # optional; without it Unmute runs in offline mode
+cp .env.example .env            # optional: paste GEMINI_API_KEY=... into .env (gitignored)
 .venv/bin/uvicorn server.app:app --reload
 ```
 
@@ -74,7 +81,15 @@ Run `scripts/evaluate.py` and copy the numbers here. **Only measured numbers go 
 
 | Person | Samples | Phrases | Top-1 | Top-3 |
 | --- | --- | --- | --- | --- |
-| _not measured yet_ | | | | |
+| rishi | 40 | 10 | 60.0% | 82.5% |
+| pankaj | 40 | 10 | 20.0% | 50.0% |
+| **all** | 80 | 10 | 40.0% | 66.2% |
+
+Chance is 10% top-1 and 30% top-3. Measured on 14 November 2026 with the default `Config` in
+`server/classifier.py`. The same data with the first settings scored 18.8% top-1 and 35.0% top-3; the gain came
+from centring each recording on its own mean, adding velocity features, and trimming still frames. These
+settings were picked using these same 80 samples, so the numbers are optimistic until they are re-measured on
+new recordings.
 
 ## API contract
 

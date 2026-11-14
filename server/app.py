@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import alerts, rerank
+from . import alerts, features, rerank
 from .classifier import Config, Recogniser
 from .evaluation import evaluate_all
 
@@ -30,6 +30,25 @@ REQUESTS_FILE = DATA / "requests.jsonl"
 RESULTS_FILE = DATA / "results.json"
 CONFIG_FILE = DATA / "config.json"
 ENROLL_DIR.mkdir(parents=True, exist_ok=True)
+ENV_FILE = ROOT / ".env"
+
+
+def _load_env_file():
+    """Read KEY=value lines from .env (gitignored) so the Gemini key never has to be typed in a shell."""
+    if not ENV_FILE.exists():
+        return
+    for line in ENV_FILE.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        k, v = k.strip().removeprefix("export ").strip(), v.strip().strip('"').strip("'")
+        if k and v and k not in os.environ:
+            os.environ[k] = v
+
+
+_load_env_file()
+MIN_LIP_MOTION = 0.012  # below this the lips barely moved (eye-distance units)
 
 PHRASES = json.loads((DATA / "phrases.json").read_text())
 BED = os.environ.get("BED_NAME", "Bed 1")
@@ -204,6 +223,10 @@ def enroll(body: EnrollIn):
     D = len(body.frames[0])
     if any(len(f) != D for f in body.frames):
         raise HTTPException(400, "all frames must have the same length")
+    n_bs = int((body.dims or {}).get("bs", 0))
+    motion = features.lip_motion(features.to_array(body.frames), n_bs)
+    if motion < MIN_LIP_MOTION:
+        raise HTTPException(422, "Your lips barely moved. Mouth it bigger and slower, then try again.")
     sid = f"{user}__{slug(body.phrase)}__{int(time.time() * 1000)}"
     rec = {
         "id": sid,
@@ -215,7 +238,22 @@ def enroll(body: EnrollIn):
         "created": time.time(),
     }
     (ENROLL_DIR / f"{sid}.json").write_text(json.dumps(rec))
-    return {"ok": True, "id": sid}
+    return {"ok": True, "id": sid, "check": _consistency_check(user, sid, body.phrase)}
+
+
+def _consistency_check(user: str, sid: str, phrase: str) -> dict | None:
+    """Does the new sample look like this person's other samples of the same phrase?
+    Inconsistent calibration is the main cause of wrong guesses, so tell them right away."""
+    rec = get_recogniser(user)
+    if rec is None:
+        return None
+    ids = [s.get("id") for s in rec.samples]
+    if sid not in ids or rec.phrases.count(phrase) < 2:
+        return None
+    i = ids.index(sid)
+    ranked = rec.rank(rec.samples[i]["frames"], top=3, exclude=i)
+    names = [r["phrase"] for r in ranked]
+    return {"matches": bool(names and names[0] == phrase), "in_top3": phrase in names, "looks_like": names[0] if names else None}
 
 
 @app.delete("/api/enrollments/last")

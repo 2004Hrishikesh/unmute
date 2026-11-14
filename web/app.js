@@ -1,7 +1,7 @@
 // Patient view: mouth -> 3 choices -> nod to confirm -> speak (+ nurse alert if urgent).
 import {
   $, api, settings, createLandmarker, CameraControl, FaceTracker, drawMouth, PushToRecord,
-  GestureDetector, BrightnessCheck, speak, alarm, unlockAudio, beep, localTimeString,
+  GestureDetector, LongBlink, tapMode, BrightnessCheck, speak, alarm, unlockAudio, beep, localTimeString,
 } from "/common.js";
 
 const video = $("#video"), overlay = $("#overlay"), cam = $("#cam");
@@ -31,6 +31,43 @@ bindRange("pitchT", "pitchT", 8, (v) => (gest.pitchT = v));
 bindRange("yawT", "yawT", 12, (v) => (gest.yawT = v));
 let darkT = 55;
 bindRange("darkT", "darkT", 55, (v) => (darkT = v));
+
+// Confirm modes: "nod" (head), "switch" (one big button: choices are scanned, press to pick),
+// "blink" (choices are scanned, close both eyes ~1 s to pick). Switch and blink need no head movement.
+const blinker = new LongBlink({ holdMs: 800 });
+let scanMs = 2500;
+bindRange("scanS", "scanS", 2.5, (v) => (scanMs = v * 1000));
+bindRange("blinkS", "blinkS", 0.8, (v) => (blinker.holdMs = v * 1000));
+const confirmSel = $("#confirmMode"), recordSel = $("#recordMode");
+confirmSel.value = settings.get("confirmMode", "nod");
+recordSel.value = settings.get("recordMode", "hold");
+const mode = () => confirmSel.value;
+function applyMode() {
+  document.querySelectorAll(".nod-only").forEach((e) => e.classList.toggle("hidden", mode() !== "nod"));
+  document.querySelectorAll(".scan-only").forEach((e) => e.classList.toggle("hidden", mode() === "nod"));
+  document.querySelectorAll(".blink-only").forEach((e) => e.classList.toggle("hidden", mode() !== "blink"));
+  if (state === "choosing") { startScan(); renderChoices(); } else if (["idle", "spoken"].includes(state)) setState(state === "spoken" ? "idle" : state);
+}
+confirmSel.addEventListener("change", () => { settings.set("confirmMode", confirmSel.value); applyMode(); });
+recordSel.addEventListener("change", () => { settings.set("recordMode", recordSel.value); if (state === "idle") setState("idle"); });
+
+let scanTimer = null;
+function startScan() {
+  stopScan();
+  if (mode() === "nod") return;
+  const step = () => {
+    if (state !== "choosing") return;
+    if (!blinker.closed) moveSelection(1, true); // don't move away while the eyes are closing on a choice
+    scanTimer = setTimeout(step, scanMs);
+  };
+  scanTimer = setTimeout(step, scanMs * 1.4); // a little longer on the first (most likely) choice
+}
+function stopScan() { clearTimeout(scanTimer); scanTimer = null; }
+function recordHint() {
+  return tapMode()
+    ? "Press <kbd>Space</kbd> / the button once, mouth the sentence, press again."
+    : "Hold <kbd>Space</kbd> (or the button) while you mouth, then let go.";
+}
 
 const userInput = $("#userInput"), noteInput = $("#noteInput"), geminiToggle = $("#geminiToggle");
 userInput.value = settings.user;
@@ -71,6 +108,7 @@ async function refreshStatus() {
 
 function setState(s, extra = {}) {
   state = s;
+  if (s !== "choosing") stopScan();
   cam.classList.toggle("recording", s === "recording");
   $("#recDot").classList.toggle("hidden", s !== "recording");
   recordBtn.classList.toggle("on", s === "recording");
@@ -89,23 +127,30 @@ function setState(s, extra = {}) {
   if (s === "idle") {
     statusEl.textContent = "Mouth your sentence now";
     subEl.textContent = extra.msg || "";
-    hintEl.innerHTML = "Hold <kbd>Space</kbd> (or the button) while you mouth, then let go.";
+    hintEl.innerHTML = recordHint();
   }
-  if (s === "recording") { statusEl.textContent = "Recording…"; subEl.textContent = "Mouth the sentence clearly, then let go."; }
+  if (s === "recording") {
+    statusEl.textContent = "Recording…";
+    subEl.textContent = tapMode() ? "Mouth the sentence clearly, then press again." : "Mouth the sentence clearly, then let go.";
+  }
   if (s === "thinking") { statusEl.textContent = "Reading your lips…"; subEl.textContent = ""; }
   if (s === "choosing") renderChoices();
   if (s === "spoken") {
     statusEl.textContent = "Said out loud:";
     subEl.textContent = "";
     spokenEl.textContent = extra.sentence; spokenEl.classList.remove("hidden");
-    hintEl.innerHTML = "Hold <kbd>Space</kbd> to say something else.";
+    hintEl.innerHTML = recordHint().replace("while you mouth", "to say something else");
   }
   if (s === "error") { statusEl.textContent = "Something went wrong"; subEl.textContent = extra.msg || ""; }
 }
 
 function renderChoices() {
   statusEl.textContent = "Did you say…";
-  subEl.textContent = "Nod to confirm · shake your head for the next one";
+  subEl.textContent = {
+    nod: "Nod to confirm · shake your head for the next one",
+    switch: "Press the button when the right one lights up",
+    blink: "Close your eyes for a moment when the right one lights up",
+  }[mode()];
   const opts = choices.concat([RETRY]);
   choicesEl.innerHTML = "";
   opts.forEach((c, i) => {
@@ -116,24 +161,34 @@ function renderChoices() {
       b.innerHTML = `<span class="num">${i + 1}</span><span></span>`;
       b.children[1].textContent = c;
     }
+    if (i === selected && mode() !== "nod") {
+      const bar = document.createElement("span");
+      bar.className = "scanbar";
+      bar.style.animationDuration = `${scanMs * (performance.now() - choiceShownAt < 300 ? 1.4 : 1)}ms`;
+      b.appendChild(bar);
+    }
     b.addEventListener("click", () => confirm(i, "click"));
     choicesEl.appendChild(b);
   });
-  hintEl.innerHTML = "Or press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>, arrows + <kbd>Enter</kbd>, <kbd>Esc</kbd> to retry.";
+  hintEl.innerHTML = mode() === "switch"
+    ? "Switch = <kbd>Space</kbd> or <kbd>Enter</kbd> (most USB buttons type one of these). Carers can also press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>."
+    : "Or press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>, arrows + <kbd>Enter</kbd>, <kbd>Esc</kbd> to retry.";
 }
 
-function moveSelection(delta) {
+function moveSelection(delta, auto = false) {
   const n = choices.length + 1;
   selected = (selected + delta + n) % n;
-  beep(660, 60, 0.12);
+  beep(auto ? 520 : 660, 60, auto ? 0.06 : 0.12);
   renderChoices();
+  if (!auto) startScan(); // a manual move restarts the scan clock
 }
 
 // ---------------------------------------------------------------- record -> predict
 
 const ptr = new PushToRecord({
   button: recordBtn,
-  enabled: () => calibrated && ["idle", "choosing", "spoken"].includes(state),
+  // In switch mode the same button picks a choice, so it must not start a recording while choosing.
+  enabled: () => calibrated && (["idle", "spoken"].includes(state) || (state === "choosing" && mode() === "nod") || state === "recording"),
   onStart: () => { speechSynthesis.cancel(); clearTimeout(spokenTimer); setState("recording"); },
   onStop: (rec) => onRecorded(rec),
 });
@@ -158,8 +213,9 @@ async function onRecorded(rec) {
     confidences = Object.fromEntries(r.candidates.map((c) => [c.phrase, c.confidence]));
     selected = 0;
     choiceShownAt = performance.now();
-    gest.reset();
+    gest.reset(); blinker.reset();
     setState("choosing");
+    startScan();
     if (r.mode === "gemini" && r.reason) reasonEl.textContent = "Context: " + r.reason;
     if (r.mode === "offline" && r.reason) reasonEl.textContent = "Offline mode: " + r.reason;
     renderDebug(r);
@@ -184,6 +240,10 @@ async function confirm(i, method) {
     console.warn("log failed", e);
   }
 }
+
+recordBtn.addEventListener("pointerdown", () => {
+  if (state === "choosing" && mode() === "switch") confirm(selected, "switch");
+});
 
 // ---------------------------------------------------------------- urgent
 
@@ -211,9 +271,12 @@ $("#urgentAck").addEventListener("click", () => clearUrgent(true));
 // ---------------------------------------------------------------- keyboard fallback
 
 window.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
   unlockAudio();
   if (state !== "choosing") return;
+  if (mode() === "switch" && (e.code === "Space" || e.key === "Enter") && !e.repeat) {
+    e.preventDefault(); confirm(selected, "switch"); return;
+  }
   if (["1", "2", "3"].includes(e.key)) confirm(+e.key - 1, "key");
   else if (e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "Tab") { e.preventDefault(); moveSelection(1); }
   else if (e.key === "ArrowUp" || e.key === "ArrowLeft") { e.preventDefault(); moveSelection(-1); }
@@ -232,9 +295,19 @@ function onFrame(frame, ts) {
   camMsg.classList.toggle("hidden", !!frame && state !== "recording");
 
   if (frame && state === "choosing" && performance.now() - choiceShownAt > 600) {
-    const g = gest.update(frame.pitch, frame.yaw, ts);
-    if (g === "nod") confirm(selected, "nod");
-    else if (g === "shake") moveSelection(1);
+    if (mode() === "nod") {
+      const g = gest.update(frame.pitch, frame.yaw, ts);
+      if (g === "nod") confirm(selected, "nod");
+      else if (g === "shake") moveSelection(1);
+    } else if (mode() === "blink") {
+      const wasClosed = blinker.closed;
+      if (blinker.update(frame.blink, ts) === "blink") { beep(988, 120, 0.15); confirm(selected, "blink"); }
+      else if (blinker.closed !== wasClosed || blinker.closed) {
+        const sel = choicesEl.querySelector(".choice.selected");
+        if (sel) sel.style.setProperty("--blink", blinker.progress.toFixed(2));
+        if (sel) sel.classList.toggle("blinking", blinker.closed);
+      }
+    }
   }
 }
 
@@ -244,7 +317,7 @@ function renderDebug(pred) {
   const f = lastFrame, d = gest.last || { dp: 0, dy: 0 };
   const lines = [
     `fps ${tracker ? tracker.fps : 0}   brightness ${bright && bright.value != null ? bright.value.toFixed(0) : "-"}`,
-    `head Δpitch ${d.dp.toFixed(1)}°  Δyaw ${d.dy.toFixed(1)}°   jawOpen ${f ? f.jawOpen.toFixed(2) : "-"}`,
+    `head Δpitch ${d.dp.toFixed(1)}°  Δyaw ${d.dy.toFixed(1)}°   jawOpen ${f ? f.jawOpen.toFixed(2) : "-"}   eyesClosed ${f ? f.blink.toFixed(2) : "-"}`,
   ];
   if (lastPred) {
     lines.push(`last: ${lastPred.mode}, ${lastPred.timing.total_s}s`);
@@ -258,6 +331,7 @@ setInterval(() => $("#settings").open && renderDebug(), 250);
 
 let tracker = null, bright = null;
 async function boot() {
+  applyMode();
   setState("loading", { msg: "Starting camera and face tracker" });
   refreshStatus();
   // Load the face tracker while the camera starts; they don't depend on each other.

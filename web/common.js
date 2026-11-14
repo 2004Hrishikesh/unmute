@@ -249,8 +249,11 @@ export function extractFrame(res, w, h) {
   }
 
   // Mouth blendshapes, in a fixed (alphabetical) order.
-  let bs = [], bsNames = [];
+  let bs = [], bsNames = [], blink = 0;
   if (res.faceBlendshapes && res.faceBlendshapes.length) {
+    const all = res.faceBlendshapes[0].categories;
+    const sc = (n) => { const k = all.find((c) => c.categoryName === n); return k ? k.score : 0; };
+    blink = Math.min(sc("eyeBlinkLeft"), sc("eyeBlinkRight")); // both eyes closed
     const cats = res.faceBlendshapes[0].categories
       .filter((k) => k.categoryName.startsWith("jaw") || k.categoryName.startsWith("mouth") || k.categoryName === "cheekPuff")
       .sort((a, b) => a.categoryName.localeCompare(b.categoryName));
@@ -272,7 +275,7 @@ export function extractFrame(res, w, h) {
   return {
     feat: bs.concat(lips),
     dims: { bs: bs.length, lip: lips.length },
-    pitch, yaw, jawOpen,
+    pitch, yaw, jawOpen, blink,
     landmarks: lm,
   };
 }
@@ -318,29 +321,37 @@ export function drawMouth(canvas, video, frame, color = "#5eead4") {
 
 // ------------------------------------------------------------------ push to record
 
-// Hold Space (or the given button) to record; release to stop.
+// Hold Space (or the given button / a USB switch that types Space) to record; release to stop.
+// In "tap" mode (settings.recordMode) one press starts and the next press stops,
+// for patients who cannot hold a switch down.
+export const MAX_RECORD_S = 8;
+export function tapMode() { return settings.get("recordMode", "hold") === "tap"; }
 export class PushToRecord {
   constructor({ button, onStart, onStop, enabled = () => true }) {
     this.recording = false; this.frames = []; this.dims = null; this.t0 = 0;
     this.onStart = onStart; this.onStop = onStop; this.enabled = enabled;
+    const press = () => { if (tapMode() && this.recording) this.end(); else this.begin(); };
+    const release = () => { if (!tapMode()) this.end(); };
     window.addEventListener("keydown", (e) => {
       if (e.code !== "Space" || e.repeat || isTyping(e)) return;
-      e.preventDefault(); this.begin();
+      e.preventDefault(); press();
     });
     window.addEventListener("keyup", (e) => {
       if (e.code !== "Space" || isTyping(e)) return;
-      e.preventDefault(); this.end();
+      e.preventDefault(); release();
     });
     if (button) {
-      button.addEventListener("pointerdown", (e) => { e.preventDefault(); button.setPointerCapture(e.pointerId); this.begin(); });
-      button.addEventListener("pointerup", () => this.end());
-      button.addEventListener("pointercancel", () => this.end());
+      button.addEventListener("pointerdown", (e) => { e.preventDefault(); button.setPointerCapture(e.pointerId); press(); });
+      button.addEventListener("pointerup", release);
+      button.addEventListener("pointercancel", release);
     }
   }
   begin() {
     if (this.recording || !this.enabled()) return;
     unlockAudio();
     this.recording = true; this.frames = []; this.missed = 0; this.t0 = performance.now();
+    clearTimeout(this._cap);
+    this._cap = setTimeout(() => this.end(), MAX_RECORD_S * 1000); // a stuck switch never records forever
     this.onStart && this.onStart();
   }
   push(frame) {
@@ -350,7 +361,7 @@ export class PushToRecord {
   }
   end() {
     if (!this.recording) return;
-    this.recording = false;
+    this.recording = false; clearTimeout(this._cap);
     const secs = (performance.now() - this.t0) / 1000;
     this.onStop && this.onStop({ frames: this.frames, dims: this.dims, secs, fps: this.frames.length / Math.max(secs, 0.001), missed: this.missed });
   }
@@ -401,6 +412,22 @@ export class GestureDetector {
     return null;
   }
 }
+// Long blink = both eyes closed for at least holdMs. Normal blinks (~0.1-0.3 s) are ignored.
+export class LongBlink {
+  constructor(opts = {}) { this.holdMs = opts.holdMs ?? 800; this.thresh = opts.thresh ?? 0.5; this.reset(); }
+  reset() { this.closedAt = null; this.fired = false; this.progress = 0; }
+  // Returns "blink" once per long closure; this.progress is 0..1 while the eyes are shut.
+  update(score, t) {
+    if (score < this.thresh * 0.7) { this.reset(); return null; }   // eyes open (with hysteresis)
+    if (score < this.thresh && this.closedAt === null) return null;
+    if (this.closedAt === null) this.closedAt = t;
+    this.progress = Math.min(1, (t - this.closedAt) / this.holdMs);
+    if (!this.fired && this.progress >= 1) { this.fired = true; return "blink"; }
+    return null;
+  }
+  get closed() { return this.closedAt !== null; }
+}
+
 function wrap(a) { while (a > 180) a -= 360; while (a < -180) a += 360; return a; }
 
 // ------------------------------------------------------------------ brightness

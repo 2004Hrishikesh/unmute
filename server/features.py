@@ -57,3 +57,28 @@ def group_weights(dims: dict, D: int, bs_weight: float = 1.0, lip_weight: float 
 def add_deltas(seq: np.ndarray) -> np.ndarray:
     d = np.gradient(seq, axis=0)
     return np.concatenate([seq, d], axis=1)
+
+
+def lip_motion(arr: np.ndarray, n_bs: int) -> float:
+    """Average range of the lip coordinates over a recording (eye-distance units)."""
+    lips = arr[:, n_bs:]
+    if lips.shape[1] == 0:
+        lips = arr
+    return float(np.ptp(lips, axis=0).mean())
+
+
+def trim_still(arr: np.ndarray, n_bs: int, thr: float = 0.15, pad: int = 3) -> np.ndarray:
+    """Cut the still frames before the lips start and after they stop moving
+    (people press Space a little early and let go a little late)."""
+    lips = arr[:, n_bs:] if arr.shape[1] > n_bs else arr
+    if len(arr) < 10:
+        return arr
+    v = np.linalg.norm(np.diff(lips, axis=0), axis=1)
+    v = np.convolve(v, np.ones(5) / 5, mode="same")
+    if v.max() <= 0:
+        return arr
+    idx = np.where(v > thr * v.max())[0]
+    if len(idx) < 5:
+        return arr
+    lo, hi = max(0, idx[0] - pad), min(len(arr), idx[-1] + pad + 2)
+    return arr[lo:hi] if hi - lo >= 8 else arr
