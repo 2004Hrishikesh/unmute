@@ -82,6 +82,11 @@ Hold Space, mouth **"Call my family"**, let go. Cards scan. Press **Space** when
 
 Optional if time allows: switch to **Long blink**, mouth "No", close your eyes for a second on the lit card.
 
+Optional, strongest if it works in rehearsal: Settings → "How to record" → **Hands-free**. Don't touch anything.
+Mouth **"I need water"**. Recording starts and stops by itself; the top card counts down and is spoken.
+
+> "Nothing to press. The patient just mouths it."
+
 > "Or just the eyelids. Whatever movement the patient still has."
 
 Switch back to **Nod**.
@@ -134,6 +139,8 @@ Click **Proof**.
 | The right sentence is card 2 or 3, not card 1 | Shake your head to move, then nod. Or press **2** or **3**. | "It's in the top three; a shake moves to the next one." |
 | None of the three is right | Nod on "None of these: try again", or press **Esc**. Mouth it again, bigger and slower. | "Lip reading is hard; the patient just tries again. Nothing wrong gets spoken." |
 | The "judge" starter demo misses | Press the number of the right card, or skip it. | "Starter model, 35 to 69% first time in our measurements; each confirmed sentence makes it personal." |
+| Hands-free doesn't start recording | Open Settings, lower "Lip sensitivity" by 0.5. Or switch back to Hold. | "Sensitivity is a per-patient setting." |
+| Hands-free starts by itself when you talk to the judges | Expected: it reads lips, and talking moves them. Switch to Hold for the talking parts. | "It can't tell silent mouthing from speech; in the ICU the patient has no voice, so that's fine." |
 | The nod isn't detected | Press **1**. Or open Settings and lower the nod threshold. | "Carers can also press a key." |
 | The camera shows black or "Starting camera…" | Use the camera picker under the video to choose the built-in camera, then click **Retry**. | "The iPhone camera grabbed it; switching." |
 | "Face not visible" | Move so your whole face is in the frame and the light is on your face. | |

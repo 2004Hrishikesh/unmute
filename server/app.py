@@ -214,6 +214,9 @@ class LogIn(BaseModel):
     dims: dict = Field(default_factory=dict)
     fps: float | None = None
     learn: bool = True
+    # confirmed=False: the best guess is urgent and the patient has not confirmed yet. The nurse is told
+    # "possible"; the confirmed sentence that follows supersedes it. Never learned from.
+    confirmed: bool = True
 
 
 class AckIn(BaseModel):
@@ -345,6 +348,14 @@ async def predict(body: PredictIn):
 async def log(body: LogIn):
     user = safe_user(body.user)
     urgent = alerts.is_urgent(body.sentence, PHRASES["urgent"])
+    if not body.confirmed:
+        if not urgent:
+            raise HTTPException(400, "only urgent phrases can be logged as unconfirmed")
+        # Same possible alert already open for this person in the last 90 s: don't push twice.
+        for r in reversed(read_requests()):
+            if r.get("user") == user and r.get("confirmed") is False and r["sentence"] == body.sentence \
+                    and not r["acknowledged"] and time.time() - r["ts"] < 90:
+                return r
     row = {
         "id": uuid.uuid4().hex[:12],
         "ts": time.time(),
@@ -352,18 +363,28 @@ async def log(body: LogIn):
         "bed": BED,
         "sentence": body.sentence,
         "urgent": urgent,
+        "confirmed": body.confirmed,
         "method": body.method,
         "mode": body.mode,
         "acknowledged": not urgent,
         "push": None,
     }
     if urgent:
-        ok, detail = await alerts.push_ntfy(NTFY_TOPIC, body.sentence, BED)
+        text = body.sentence if body.confirmed else f"Possible (not yet confirmed): {body.sentence}"
+        ok, detail = await alerts.push_ntfy(NTFY_TOPIC, text, BED)
         row["push"] = detail
-    row["learned"] = _learn_from_use(user, body) if body.learn and body.frames else False
+    row["learned"] = _learn_from_use(user, body) if body.confirmed and body.learn and body.frames else False
     with _lock:
-        with REQUESTS_FILE.open("a") as f:
-            f.write(json.dumps(row) + "\n")
+        rows = read_requests()
+        if body.confirmed:
+            # The patient has now said what they meant: close this person's open "possible" alerts.
+            for r in rows:
+                if r.get("user") == user and r.get("confirmed") is False and not r["acknowledged"] \
+                        and time.time() - r["ts"] < 180:
+                    r["acknowledged"] = True
+                    r["superseded_by"] = row["id"]
+        rows.append(row)
+        write_requests(rows)
     return row
 
 

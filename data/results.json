@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-14 17:21:27",
+  "generated_at": "2026-11-14 17:49:52",
   "method": "leave-one-out, per user (each sample is matched only against that user's other samples)",
   "config": {
     "length": 30,
@@ -16,109 +16,134 @@
   },
   "with_gemini": false,
   "overall": {
-    "samples": 66,
-    "top1": 0.5455,
-    "top3": 0.7121
+    "samples": 142,
+    "top1": 0.7958,
+    "top3": 0.9225
   },
   "users": {
     "kesh": {
-      "samples": 26,
-      "phrases": 13,
-      "top1": 0.2308,
-      "top3": 0.3462,
-      "chance_top1": 0.0769,
-      "chance_top3": 0.2308,
+      "samples": 102,
+      "phrases": 20,
+      "top1": 0.8137,
+      "top3": 0.9118,
+      "chance_top1": 0.05,
+      "chance_top3": 0.15,
       "per_phrase": {
         "Call my family": {
-          "n": 2,
-          "top1": 0.0,
-          "top3": 0.0
+          "n": 5,
+          "top1": 1.0,
+          "top3": 1.0
+        },
+        "Call the nurse": {
+          "n": 5,
+          "top1": 0.8,
+          "top3": 0.8
+        },
+        "Help me": {
+          "n": 5,
+          "top1": 1.0,
+          "top3": 1.0
         },
         "I am cold": {
-          "n": 2,
-          "top1": 0.0,
-          "top3": 0.0
+          "n": 5,
+          "top1": 0.8,
+          "top3": 0.8
         },
         "I am hot": {
-          "n": 2,
-          "top1": 0.0,
-          "top3": 0.0
+          "n": 5,
+          "top1": 0.4,
+          "top3": 0.8
+        },
+        "I am in pain": {
+          "n": 5,
+          "top1": 1.0,
+          "top3": 1.0
         },
         "I am scared": {
-          "n": 2,
-          "top1": 0.0,
-          "top3": 0.0
+          "n": 5,
+          "top1": 0.4,
+          "top3": 0.6
+        },
+        "I am tired": {
+          "n": 6,
+          "top1": 0.6667,
+          "top3": 1.0
         },
         "I cannot breathe": {
-          "n": 2,
-          "top1": 0.0,
-          "top3": 0.0
+          "n": 5,
+          "top1": 0.8,
+          "top3": 0.8
         },
         "I feel sick": {
-          "n": 2,
-          "top1": 0.5,
+          "n": 5,
+          "top1": 0.8,
+          "top3": 0.8
+        },
+        "I love you": {
+          "n": 6,
+          "top1": 0.8333,
           "top3": 1.0
         },
         "I need the toilet": {
-          "n": 2,
-          "top1": 0.0,
-          "top3": 0.0
+          "n": 5,
+          "top1": 0.6,
+          "top3": 0.8
+        },
+        "I need water": {
+          "n": 5,
+          "top1": 1.0,
+          "top3": 1.0
         },
         "Move my pillow": {
-          "n": 2,
-          "top1": 0.0,
-          "top3": 0.0
+          "n": 5,
+          "top1": 0.8,
+          "top3": 0.8
         },
         "No": {
-          "n": 2,
+          "n": 5,
           "top1": 1.0,
           "top3": 1.0
         },
         "Thank you": {
-          "n": 2,
-          "top1": 0.0,
-          "top3": 0.0
+          "n": 5,
+          "top1": 1.0,
+          "top3": 1.0
+        },
+        "Turn off the light": {
+          "n": 5,
+          "top1": 0.8,
+          "top3": 1.0
         },
         "What time is it": {
-          "n": 2,
-          "top1": 0.0,
-          "top3": 0.5
+          "n": 5,
+          "top1": 1.0,
+          "top3": 1.0
         },
         "Where am I": {
-          "n": 2,
+          "n": 5,
           "top1": 1.0,
           "top3": 1.0
         },
         "Yes": {
-          "n": 2,
-          "top1": 0.5,
+          "n": 5,
+          "top1": 0.6,
           "top3": 1.0
         }
       },
       "confusions": [
         {
-          "said": "What time is it",
-          "predicted": "Where am I",
+          "said": "I am scared",
+          "predicted": "I am tired",
           "count": 2
         },
         {
-          "said": "Call my family",
-          "predicted": "I need the toilet",
-          "count": 1
-        },
-        {
-          "said": "Call my family",
-          "predicted": "What time is it",
+          "said": "Call the nurse",
+          "predicted": "No",
           "count": 1
         },
         {
           "said": "I am cold",
-          "predicted": "I am hot",
-          "count": 1
-        },
-        {
-          "said": "I am cold",
-          "predicted": "Thank you",
+          "predicted": "I love you",
           "count": 1
         },
         {
@@ -132,12 +157,22 @@
           "count": 1
         },
         {
-          "said": "I am scared",
-          "predicted": "I feel sick",
+          "said": "I am hot",
+          "predicted": "I am tired",
           "count": 1
         },
         {
           "said": "I am scared",
+          "predicted": "Turn off the light",
+          "count": 1
+        },
+        {
+          "said": "I am tired",
+          "predicted": "I am scared",
+          "count": 1
+        },
+        {
+          "said": "I am tired",
           "predicted": "I am hot",
           "count": 1
         },
@@ -255,13 +290,13 @@
     "method": "leave-one-out over the pooled recordings of every user (how /api/predict works)",
     "users": {
       "kesh": {
-        "samples": 33,
-        "top1": 0.2424,
-        "top3": 0.5455
+        "samples": 102,
+        "top1": 0.7745,
+        "top3": 0.9216
       },
       "rishi": {
         "samples": 40,
-        "top1": 0.75,
+        "top1": 0.7,
         "top3": 0.975
       }
     }
@@ -270,17 +305,17 @@
     "method": "cross-person: each user's samples matched only against other users' recordings",
     "users": {
       "kesh": {
-        "samples": 16,
-        "top1": 0.6875,
-        "top3": 0.9375,
+        "samples": 51,
+        "top1": 0.7059,
+        "top3": 0.902,
         "phrases": 10,
         "chance_top1": 0.1,
         "chance_top3": 0.3
       },
       "rishi": {
         "samples": 40,
-        "top1": 0.35,
-        "top3": 0.6,
+        "top1": 0.425,
+        "top3": 0.75,
         "phrases": 20,
         "chance_top1": 0.05,
         "chance_top3": 0.15

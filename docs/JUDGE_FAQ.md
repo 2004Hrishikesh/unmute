@@ -38,10 +38,12 @@ Second, one person's recordings of the same phrase vary a lot; the same recognis
 Calibration now warns when a recording doesn't match the previous ones. The number that matters at the bedside is
 top-3, because the patient picks from three cards: 74% overall, 95% for the best person.
 
-**7. What about patients who can't nod?**
+**7. What about patients who can't nod, or can't press anything at all?**
 Settings offers three confirm methods. Nod and shake. Button or switch: the cards light up one by one and a press
 on any button or an assistive switch picks the lit one. Long blink: eyes closed for about 0.8 seconds picks the
-lit card. Recording can also be "tap to start, tap to stop" for patients who can't hold a button.
+lit card. And a hands-free mode: recording starts when the lips move and stops when they rest, and the top card is
+spoken by itself after a countdown unless the patient shakes, presses, or mouths again. If the best guess is
+urgent, the nurse is alerted immediately as "possible", before confirmation.
 
 **8. What about privacy? It's a camera in an ICU.**
 Face tracking runs inside the browser. The server receives about 108 numbers per frame (lip point positions and

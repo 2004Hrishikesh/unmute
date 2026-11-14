@@ -26,19 +26,20 @@ async function refresh() {
     const tr = document.createElement("tr");
     if (r.urgent) tr.className = "urgent-row" + (r.acknowledged ? "" : " open");
     const t = new Date(r.ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    tr.append(cell(`${t} (${r.ago})`), cell(`${r.bed} · ${r.user}`), cell(r.sentence, "sentence"),
-      cell(`${r.method}${r.mode ? ", " + r.mode : ""}`));
+    const possible = r.confirmed === false;
+    tr.append(cell(`${t} (${r.ago})`), cell(`${r.bed} · ${r.user}`), cell((possible ? "Possible: " : "") + r.sentence, "sentence"),
+      cell(possible ? "best guess, not confirmed yet" : `${r.method}${r.mode ? ", " + r.mode : ""}`));
     const st = document.createElement("td");
     if (r.urgent && !r.acknowledged) {
       const b = document.createElement("button"); b.className = "btn danger"; b.textContent = "Acknowledge";
       b.onclick = () => ack(r.id); st.appendChild(b);
-    } else st.textContent = r.urgent ? "urgent · acknowledged" : "logged";
+    } else st.textContent = r.urgent ? (r.superseded_by ? "possible · patient then confirmed below" : "urgent · acknowledged") : "logged";
     tr.appendChild(st);
     tbody.appendChild(tr);
   }
   const open = data.requests.filter((r) => r.urgent && !r.acknowledged);
   $("#alarmBox").classList.toggle("hidden", !open.length);
-  if (open.length) $("#alarmText").textContent = `URGENT · ${open[0].bed}: “${open[0].sentence}”` + (open.length > 1 ? ` (+${open.length - 1} more)` : "");
+  if (open.length) $("#alarmText").textContent = `${open[0].confirmed === false ? "POSSIBLE URGENT" : "URGENT"} · ${open[0].bed}: “${open[0].sentence}”` + (open.length > 1 ? ` (+${open.length - 1} more)` : "");
   alarm(soundOn && open.length > 0);
 }
 

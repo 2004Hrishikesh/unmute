@@ -56,7 +56,13 @@ Unmute is a communication aid. It is not a medical device and it does not diagno
   - **Button / switch**: the choices light up one by one; one press picks the lit one. Any USB button or
     assistive "jelly bean" switch that types Space or Enter works, with no driver.
   - **Long blink**: the same scanning; closing both eyes for about 0.8 s picks. Normal blinks are ignored.
-  - Recording can be "hold while mouthing" or "tap to start, tap to stop", for patients who can't hold a switch.
+  - Recording can be "hold while mouthing", "tap to start, tap to stop", or **hands-free**: recording starts when
+    the lips start moving and stops when they rest (thresholds measured on our own recordings: still face p95
+    0.0016, mouthing peak median 0.0050 mean lip change per frame). In hands-free mode the top card is spoken by
+    itself after a countdown (default 4 s) unless the patient nods, shakes, presses, or simply mouths again.
+  - **Early nurse alert.** When the best guess is an urgent phrase, the nurse is told "Possible (not yet
+    confirmed): I cannot breathe" immediately, before the patient confirms. The confirmed sentence that follows
+    supersedes it on the Nurse page. Off in Settings if false alarms matter more than seconds.
   - Carers can always use keys `1` `2` `3`, arrows + `Enter`, or a mouse click.
 - **Calibration quality check.** After each sample, Unmute checks whether it looks like the person's other samples of
   the same phrase and asks them to redo it if not. Recordings where the lips barely moved are rejected.
@@ -142,7 +148,7 @@ All JSON. A frame is a flat list of floats: `[mouth blendshapes (dims.bs) | lip 
 | `GET /api/enrollments?user=` | | `{user, counts, own_samples, own_from_use, personal, starter_available, starter_samples, starter_users}` |
 | `DELETE /api/enrollments/last?user=` | | `{ok, deleted}` |
 | `POST /api/predict` | `{user, frames, note, local_time, use_gemini}` | `{candidates: [{phrase, distance, confidence}] (top 5), choices: [3], mode: "gemini"\|"offline", reason, source: "personal"\|"starter", timing}` |
-| `POST /api/log` | `{user, sentence, method, mode, learn?, frames?, dims?, fps?}` | the stored row, incl. `urgent`, `push`, `learned` |
+| `POST /api/log` | `{user, sentence, method, mode, learn?, frames?, dims?, fps?, confirmed?}` | the stored row, incl. `urgent`, `push`, `learned`; `confirmed: false` (urgent phrases only) logs a "possible" alert that the next confirmed sentence supersedes |
 | `GET /api/requests` | | `{requests: [...newest first], unacknowledged_urgent}` |
 | `POST /api/ack` | `{id}` (or `"all"`) | `{ok}` |
 | `GET /api/results` / `POST /api/evaluate` | | leave-one-out results |

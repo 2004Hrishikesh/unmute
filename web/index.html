@@ -54,8 +54,16 @@
             <select id="recordMode">
               <option value="hold">Hold the button / Space while mouthing</option>
               <option value="tap">Tap once to start, tap again to stop</option>
+              <option value="auto">Hands-free: starts when the lips move, stops when they rest</option>
             </select>
           </label>
+          <label class="auto-only">Lip sensitivity (lower = starts more easily): <span id="lipSensVal"></span>
+            <input id="lipSens" type="range" min="1.5" max="5" step="0.25" />
+          </label>
+          <label class="auto-only">Speak the top choice by itself after (seconds, 0 = never): <span id="autoSVal"></span>
+            <input id="autoS" type="range" min="0" max="10" step="0.5" />
+          </label>
+          <label class="row"><input id="earlyPing" type="checkbox" checked /> Alert the nurse the moment an urgent phrase is the top guess, before confirmation</label>
           <label class="scan-only">Time on each choice (seconds): <span id="scanSVal"></span>
             <input id="scanS" type="range" min="1" max="6" step="0.5" />
           </label>

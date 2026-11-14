@@ -326,6 +326,7 @@ export function drawMouth(canvas, video, frame, color = "#5eead4") {
 // for patients who cannot hold a switch down.
 export const MAX_RECORD_S = 8;
 export function tapMode() { return settings.get("recordMode", "hold") === "tap"; }
+export function autoMode() { return settings.get("recordMode", "hold") === "auto"; }
 export class PushToRecord {
   constructor({ button, onStart, onStop, enabled = () => true }) {
     this.recording = false; this.frames = []; this.dims = null; this.t0 = 0;
@@ -412,6 +413,41 @@ export class GestureDetector {
     return null;
   }
 }
+// Hands-free recording: start when the lips start moving, stop when they have been still for stopMs.
+// Energy = mean |frame-to-frame change| over the lip coordinates, EMA-smoothed. Measured on our recordings:
+// still face p95 = 0.0016, p99 = 0.0029; peak while mouthing p10 = 0.0025, median 0.0050.
+export class LipActivity {
+  constructor(opts = {}) {
+    this.startT = opts.startT ?? 0.0025; this.stopFrac = opts.stopFrac ?? 0.45;
+    this.startFrames = opts.startFrames ?? 3; this.stopMs = opts.stopMs ?? 700;
+    this.minMs = opts.minMs ?? 600; this.maxMs = opts.maxMs ?? 6000;
+    this.reset();
+  }
+  reset() { this.prev = null; this.energy = 0; this.above = 0; this.active = false; this.quietSince = null; this.startedAt = 0; }
+  // Returns "start", "stop" or null. `lips` = the lip part of the feature vector.
+  update(lips, t) {
+    if (!lips) { this.prev = null; return this.active ? this._stop() : null; }
+    if (this.prev && this.prev.length === lips.length) {
+      let s = 0;
+      for (let i = 0; i < lips.length; i++) s += Math.abs(lips[i] - this.prev[i]);
+      this.energy = 0.6 * this.energy + 0.4 * (s / lips.length);
+    }
+    this.prev = lips;
+    if (!this.active) {
+      this.above = this.energy > this.startT ? this.above + 1 : 0;
+      if (this.above >= this.startFrames) { this.active = true; this.startedAt = t; this.quietSince = null; this.above = 0; return "start"; }
+      return null;
+    }
+    const quiet = this.energy < this.startT * this.stopFrac;
+    if (quiet) { if (this.quietSince === null) this.quietSince = t; }
+    else this.quietSince = null;
+    const dur = t - this.startedAt;
+    if ((this.quietSince !== null && t - this.quietSince >= this.stopMs && dur >= this.minMs) || dur >= this.maxMs) return this._stop();
+    return null;
+  }
+  _stop() { this.active = false; this.quietSince = null; return "stop"; }
+}
+
 // Long blink = both eyes closed for at least holdMs. Normal blinks (~0.1-0.3 s) are ignored.
 export class LongBlink {
   constructor(opts = {}) { this.holdMs = opts.holdMs ?? 800; this.thresh = opts.thresh ?? 0.5; this.reset(); }

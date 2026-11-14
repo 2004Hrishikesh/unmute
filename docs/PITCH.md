@@ -35,12 +35,15 @@ they confirm teaches Unmute their own lips. It needs no training data and works 
    requests, and an optional care note ("post-surgery, nil by mouth"). Gemini may reorder the candidates to break
    near-ties. It cannot add a sentence. If it takes more than 3 seconds, or there is no key or no network, Unmute
    uses the lip-reading order and shows an "offline mode" badge.
-4. **Confirm with whatever movement the patient has.** Nod to confirm and shake for the next choice. Or, if the
-   patient can't move their head: the cards light up one by one, and a press on any button or switch picks the lit
-   one. Or a long blink (eyes closed for about 0.8 s) picks it. Carers can press 1, 2, 3.
+4. **Confirm with whatever movement the patient has, or none.** Nod to confirm and shake for the next choice. Or,
+   if the patient can't move their head: the cards light up one by one, and a press on any button or switch picks
+   the lit one. Or a long blink (eyes closed for about 0.8 s) picks it. Or hands-free: recording starts when the
+   lips move and stops when they rest, and the top card is spoken by itself after a short countdown unless the
+   patient objects or mouths again. Carers can press 1, 2, 3.
 5. **Speak and escalate.** The browser speaks the sentence. Urgent phrases ("I cannot breathe", "I am in pain",
    "Help me", "Call the nurse", "I feel sick") turn the screen red, sound an alarm, mark the request red on the
-   nurse page, and send a push notification to the nurse's phone through ntfy.
+   nurse page, and send a push notification to the nurse's phone through ntfy. When the best guess is urgent, the
+   nurse is told "possible, not yet confirmed" the moment the cards appear; the confirmation follows seconds later.
 
 ## Does the patient have to calibrate? No.
 
