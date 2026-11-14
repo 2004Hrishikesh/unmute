@@ -130,10 +130,11 @@ export async function startCamera(video, deviceId = null) {
   const t0 = performance.now();
   const track = stream.getVideoTracks()[0];
   while (!(video.videoWidth > 0 && video.readyState >= 2)) {
-    if (performance.now() - t0 > 8000) {
+    if (performance.now() - t0 > 6000) {
       const why = `track ${track ? track.readyState : "none"}, muted=${track ? track.muted : "?"}, label="${track ? track.label : ""}"`;
+      const failedId = track ? track.getSettings().deviceId : null;
       stream.getTracks().forEach((t) => t.stop()); currentStream = null;
-      throw Object.assign(new Error("no frames from camera (" + why + ")"), { name: "Timeout" });
+      throw Object.assign(new Error("no frames from camera (" + why + ")"), { name: "Timeout", deviceId: failedId });
     }
     if (performance.now() - t0 > 2500) video.play().catch(() => {});
     await new Promise((r) => setTimeout(r, 150));
@@ -145,6 +146,16 @@ export async function listCameras() {
   try { return (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput"); }
   catch { return []; }
 }
+
+// Built-in laptop cameras first; iPhone Continuity / Desk View cameras last
+// (macOS often makes the iPhone the default even when the phone isn't set up as a webcam).
+function cameraRank(c) {
+  const l = (c.label || "").toLowerCase();
+  if (/facetime|built-in|macbook|integrated/.test(l)) return 0;
+  if (/iphone|continuity|desk view|ipad/.test(l)) return 2;
+  return 1;
+}
+export function sortCameras(cams) { return cams.slice().sort((a, b) => cameraRank(a) - cameraRank(b)); }
 
 // Adds a camera picker + Retry button under the video and keeps the camera running.
 export class CameraControl {
@@ -179,15 +190,27 @@ export class CameraControl {
     const slow = setTimeout(() => {
       if (!this.ok) this.msgEl.textContent = "Still waiting for the camera… If the browser shows a permission prompt near the address bar, click Allow.";
     }, 4000);
-    const wanted = settings.get("cameraId", null);
+    let wanted = settings.get("cameraId", null);
+    if (!wanted) { // labels are known once permission was granted before: pick the built-in camera
+      const best = sortCameras(await listCameras())[0];
+      if (best && best.label && best.deviceId) wanted = best.deviceId;
+    }
     try {
-      let info;
+      let info = null, err = null;
+      const tried = new Set();
       try { info = await startCamera(this.video, wanted); }
-      catch (e) {
-        if (!wanted || e.name === "NotAllowedError") throw e;
-        settings.set("cameraId", null); // remembered camera is gone: use the default
-        info = await startCamera(this.video, null);
+      catch (e) { err = e; tried.add(wanted); if (e.deviceId) tried.add(e.deviceId); }
+      // That camera failed (busy, or an iPhone sending nothing): try every other camera in turn.
+      if (!info && err.name !== "NotAllowedError" && err.name !== "SecurityError") {
+        for (const c of sortCameras(await listCameras())) {
+          if (!c.deviceId || tried.has(c.deviceId)) continue;
+          this.msgEl.textContent = `Trying ${c.label || "another camera"}…`;
+          try { info = await startCamera(this.video, c.deviceId); break; }
+          catch (e) { err = e; tried.add(c.deviceId); }
+        }
       }
+      if (!info) throw err;
+      settings.set("cameraId", info.deviceId);
       this.ok = true;
       await this.fillList(info.deviceId);
       this.msgEl.textContent = `Camera on: ${info.label || "webcam"}`;
