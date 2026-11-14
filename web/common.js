@@ -78,14 +78,117 @@ export async function createLandmarker(onStatus = () => {}) {
   }
 }
 
-export async function startCamera(video) {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
-    audio: false,
-  });
+// Explains a camera failure in plain words, with the fix.
+export function cameraHelp(e) {
+  if (!window.isSecureContext)
+    return "The browser only allows the camera on http://localhost:8000. Open that address (not a file:// or network IP).";
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
+    return "This browser window can't use cameras. Open http://localhost:8000 in Google Chrome.";
+  const n = e && e.name;
+  if (n === "NotAllowedError" || n === "SecurityError")
+    return "Camera permission is blocked. 1) Use Google Chrome, not the Claude app's preview pane. " +
+      "2) Click the camera icon in the address bar, choose Allow, then Retry. " +
+      "3) On a Mac: System Settings → Privacy & Security → Camera → turn on Google Chrome, then quit and reopen Chrome.";
+  if (n === "NotFoundError" || n === "OverconstrainedError")
+    return "No camera found. Pick another camera from the list, or check that the webcam is connected.";
+  if (n === "NotReadableError" || n === "AbortError" || n === "TrackStartError")
+    return "The camera is busy or failed to start. Close FaceTime, Zoom, Photo Booth or other tabs using it, then Retry.";
+  if (n === "Timeout") return "The camera started but sends no picture. Pick another camera from the list or Retry.";
+  return `Camera error (${n || "unknown"}): ${(e && e.message) || e}`;
+}
+
+let currentStream = null;
+
+// Starts the camera, trying gentler settings if the first attempt fails.
+export async function startCamera(video, deviceId = null) {
+  if (currentStream) { currentStream.getTracks().forEach((t) => t.stop()); currentStream = null; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw Object.assign(new Error("no mediaDevices"), { name: "NoMediaDevices" });
+  const dev = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "user" };
+  const attempts = [
+    { ...dev, width: { ideal: 1280 }, height: { ideal: 720 } },
+    { ...dev },
+    deviceId ? { deviceId } : true,
+  ];
+  let lastErr = null, stream = null;
+  for (const v of attempts) {
+    try { stream = await navigator.mediaDevices.getUserMedia({ video: v, audio: false }); break; }
+    catch (e) {
+      lastErr = e;
+      if (e.name === "NotAllowedError" || e.name === "SecurityError") throw e; // retrying won't help
+    }
+  }
+  if (!stream) throw lastErr;
+  currentStream = stream;
+  video.muted = true; video.playsInline = true;
   video.srcObject = stream;
-  await video.play();
-  await new Promise((res) => (video.readyState >= 2 ? res() : (video.onloadeddata = res)));
+  try { await video.play(); } catch {}
+  // Wait until real frames arrive (some Mac cameras take a moment to wake up).
+  const t0 = performance.now();
+  while (!(video.videoWidth > 0 && video.readyState >= 2)) {
+    if (performance.now() - t0 > 6000) throw Object.assign(new Error("no frames from camera"), { name: "Timeout" });
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  const track = stream.getVideoTracks()[0];
+  return { label: track.label, deviceId: track.getSettings().deviceId, width: video.videoWidth, height: video.videoHeight };
+}
+
+export async function listCameras() {
+  try { return (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput"); }
+  catch { return []; }
+}
+
+// Adds a camera picker + Retry button under the video and keeps the camera running.
+export class CameraControl {
+  constructor({ video, after, msgEl, onReady = () => {}, onError = () => {} }) {
+    this.video = video; this.msgEl = msgEl; this.onReady = onReady; this.onError = onError; this.ok = false;
+    const bar = document.createElement("div");
+    bar.className = "cam-bar";
+    bar.innerHTML = `<select title="Camera"></select><button class="btn">Retry camera</button>`;
+    after.insertAdjacentElement("afterend", bar);
+    this.select = bar.querySelector("select"); this.retry = bar.querySelector("button");
+    this.select.addEventListener("change", () => { settings.set("cameraId", this.select.value); this.start(); });
+    this.retry.addEventListener("click", () => this.start());
+    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener)
+      navigator.mediaDevices.addEventListener("devicechange", () => this.fillList());
+  }
+  async fillList(activeId) {
+    const cams = await listCameras();
+    this.select.innerHTML = "";
+    if (!cams.length) { this.select.innerHTML = "<option>No camera found</option>"; return; }
+    cams.forEach((c, i) => {
+      const o = document.createElement("option");
+      o.value = c.deviceId; o.textContent = c.label || `Camera ${i + 1}`;
+      if (c.deviceId && c.deviceId === activeId) o.selected = true;
+      this.select.appendChild(o);
+    });
+  }
+  async start() {
+    this.ok = false;
+    this.msgEl.classList.remove("hidden");
+    this.msgEl.textContent = "Starting camera… (allow access if Chrome asks)";
+    this.retry.disabled = true;
+    const wanted = settings.get("cameraId", null);
+    try {
+      let info;
+      try { info = await startCamera(this.video, wanted); }
+      catch (e) {
+        if (!wanted || e.name === "NotAllowedError") throw e;
+        settings.set("cameraId", null); // remembered camera is gone: use the default
+        info = await startCamera(this.video, null);
+      }
+      this.ok = true;
+      await this.fillList(info.deviceId);
+      this.msgEl.textContent = `Camera on: ${info.label || "webcam"}`;
+      this.onReady(info);
+    } catch (e) {
+      console.warn("camera failed", e);
+      await this.fillList(wanted);
+      const help = cameraHelp(e);
+      this.msgEl.textContent = help;
+      this.onError(help, e);
+    } finally { this.retry.disabled = false; }
+    return this.ok;
+  }
 }
 
 // Converts a Face Landmarker result into our per-frame feature vector.

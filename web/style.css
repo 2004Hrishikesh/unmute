@@ -163,3 +163,16 @@ td.sentence { font-size: 1.3rem; font-weight: 700; }
 .stat .k { color: var(--muted); font-size: 0.9rem; }
 h2 { margin: 0 0 10px; }
 code { background: var(--panel-2); padding: 2px 6px; border-radius: 6px; }
+
+/* ---------- camera picker */
+.cam-bar { display: flex; gap: 10px; margin-top: 10px; }
+.cam-bar select { flex: 1; min-width: 0; }
+.cam .cam-msg { line-height: 1.4; }
+.cam .cam-msg { max-height: calc(100% - 24px); overflow-y: auto; }
+.topbar { flex-wrap: wrap; row-gap: 8px; }
+.topbar nav { flex-wrap: nowrap; overflow-x: auto; }
+@media (max-width: 700px) {
+  .topbar { padding: 10px 16px; gap: 12px; }
+  .topbar nav a { padding: 6px 10px; }
+  .topbar .right { margin-left: 0; }
+}

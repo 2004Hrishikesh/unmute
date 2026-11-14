@@ -1,6 +1,6 @@
 // Patient view: mouth -> 3 choices -> nod to confirm -> speak (+ nurse alert if urgent).
 import {
-  $, api, settings, createLandmarker, startCamera, FaceTracker, drawMouth, PushToRecord,
+  $, api, settings, createLandmarker, CameraControl, FaceTracker, drawMouth, PushToRecord,
   GestureDetector, BrightnessCheck, speak, alarm, unlockAudio, beep, localTimeString,
 } from "/common.js";
 
@@ -260,23 +260,26 @@ let tracker = null, bright = null;
 async function boot() {
   setState("loading", { msg: "Starting camera and face tracker" });
   refreshStatus();
+  // Load the face tracker while the camera starts; they don't depend on each other.
+  const lmPromise = createLandmarker(() => {});
+  let lmReady = false;
+  const camera = new CameraControl({
+    video, after: recordBtn, msgEl: camMsg,
+    onReady: () => { if (lmReady) refreshUser(); },
+    onError: (help) => setState("error", { msg: help }),
+  });
+  const camOk = await camera.start();
   try {
-    await startCamera(video);
-  } catch (e) {
-    camMsg.textContent = "Camera blocked: allow camera access and reload.";
-    setState("error", { msg: "Unmute needs the camera. " + e.message });
-    return;
-  }
-  try {
-    const lm = await createLandmarker((m) => (camMsg.textContent = m));
+    const lm = await lmPromise;
     tracker = new FaceTracker(video, lm, onFrame);
     tracker.start();
+    lmReady = true;
   } catch (e) {
-    setState("error", { msg: "Face tracker failed to load: " + e.message });
+    setState("error", { msg: "Face tracker failed to load (needs internet once, or run scripts/fetch_vendor.sh): " + e.message });
     return;
   }
   bright = new BrightnessCheck(video, (dark) => $("#darkBanner").classList.toggle("hidden", !dark), () => darkT);
-  await refreshUser();
+  if (camOk) await refreshUser();
   setInterval(refreshStatus, 15000);
 }
 boot();

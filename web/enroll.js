@@ -1,6 +1,6 @@
 // Calibration: record each phrase a few times for the current user.
 import {
-  $, api, settings, createLandmarker, startCamera, FaceTracker, drawMouth, PushToRecord,
+  $, api, settings, createLandmarker, CameraControl, FaceTracker, drawMouth, PushToRecord,
   BrightnessCheck, beep, unlockAudio,
 } from "/common.js";
 
@@ -109,8 +109,18 @@ window.addEventListener("keydown", unlockAudio);
 async function boot() {
   PH = await api("/api/phrases");
   await loadCounts();
-  try { await startCamera(video); } catch (e) { camMsg.textContent = "Camera blocked: allow camera access and reload."; return; }
-  const lm = await createLandmarker((m) => (camMsg.textContent = m));
+  const lmPromise = createLandmarker(() => {});
+  let lmReady = false;
+  const camera = new CameraControl({
+    video, after: cam, msgEl: camMsg,
+    onReady: () => { ready = lmReady; msgEl.innerHTML = "Hold <kbd>Space</kbd> (or the button), mouth the phrase, let go."; render(); },
+    onError: (help) => { ready = false; msgEl.innerHTML = `<span class="flash-bad"></span>`; msgEl.firstChild.textContent = help; render(); },
+  });
+  await camera.start();
+  let lm;
+  try { lm = await lmPromise; }
+  catch (e) { msgEl.textContent = "Face tracker failed to load (needs internet once, or run scripts/fetch_vendor.sh): " + e.message; return; }
+  lmReady = true;
   new FaceTracker(video, lm, (frame) => {
     drawMouth(overlay, video, frame, ptr.recording ? "#f87171" : "#5eead4");
     ptr.push(frame);
@@ -118,6 +128,6 @@ async function boot() {
     camMsg.classList.toggle("hidden", !!frame);
   }).start();
   new BrightnessCheck(video, (dark) => $("#darkBanner").classList.toggle("hidden", !dark), () => settings.get("darkT", 55));
-  ready = true; render();
+  ready = camera.ok; render();
 }
 boot();
