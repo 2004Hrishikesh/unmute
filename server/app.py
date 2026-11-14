@@ -48,9 +48,11 @@ def _load_env_file():
 
 
 _load_env_file()
+rerank.STATE_FILE = DATA / "gemini_state.json"  # gitignored
 MIN_LIP_MOTION = 0.012  # below this the lips barely moved (eye-distance units)
 
 PHRASES = json.loads((DATA / "phrases.json").read_text())
+rerank.URGENT = set(PHRASES["urgent"])
 BED = os.environ.get("BED_NAME", "Bed 1")
 
 

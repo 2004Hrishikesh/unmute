@@ -31,6 +31,14 @@ Unmute is a communication aid. It is not a medical device and it does not diagno
 - **Only numbers leave the camera.** Face tracking runs in the browser, and the server receives about 108 numbers per frame, never video.
 - **Bedside context.** Gemini sees the top 5 lip-reading candidates plus the time, the last 5 requests and an
   optional care note. It reorders them only to break near-ties, and it may only pick from the candidates.
+  **Safety rule, enforced in code:** Gemini can never remove the lip-reading top match, or an urgent phrase in the
+  lip-reading top 3, from the 3 choices. In testing it once dropped "I need water" because water had "just been
+  given"; that can no longer happen.
+- **Gemini model choice.** The server lists the Flash models your key can use (this costs no quota) and prefers
+  the fast "lite" ones: we measured about 0.5–1.3 s per call against 1.3–7 s for the full models, which were
+  often overloaded. When a model refuses, it rests: until its quota resets on 429 (free keys get as few as 20
+  requests a day per model), 60 s on 503, and a week on 404 (retired). The next model is tried within the same
+  3 s, and resting times are remembered in `data/gemini_state.json`.
 - **Works offline.** If there is no key, no network, or Gemini takes longer than 3 seconds, Unmute uses the
   classifier's top 3 and shows an "offline mode" badge. Speech uses the browser's built-in voices. To load the face
   tracker without internet, run `scripts/fetch_vendor.sh` once.
@@ -81,15 +89,27 @@ Run `scripts/evaluate.py` and copy the numbers here. **Only measured numbers go 
 
 | Person | Samples | Phrases | Top-1 | Top-3 |
 | --- | --- | --- | --- | --- |
-| rishi | 40 | 10 | 60.0% | 82.5% |
-| pankaj | 40 | 10 | 20.0% | 50.0% |
-| **all** | 80 | 10 | 40.0% | 66.2% |
+| rishi | 40 | 10 | 75.0% | 95.0% |
+| pankaj | 40 | 10 | 20.0% | 52.5% |
+| **all** | 80 | 10 | 47.5% | 73.8% |
 
 Chance is 10% top-1 and 30% top-3. Measured on 14 November 2026 with the default `Config` in
-`server/classifier.py`. The same data with the first settings scored 18.8% top-1 and 35.0% top-3; the gain came
-from centring each recording on its own mean, adding velocity features, and trimming still frames. These
-settings were picked using these same 80 samples, so the numbers are optimistic until they are re-measured on
-new recordings.
+`server/classifier.py`. The first settings scored 18.8% top-1 and 35.0% top-3 on the same data. Measured step by step:
+
+| Change | Top-1 | Top-3 |
+| --- | --- | --- |
+| First settings | 18.8% | 35.0% |
+| + centre each recording on its own mean, add velocity, trim still frames, lip points only | 40.0% | 66.2% |
+| + hubness correction (stops short phrases like "Yes" soaking up wrong answers) | 47.5% | 73.8% |
+
+These settings were picked using these same 80 samples, so the numbers are optimistic until they are re-measured
+on new recordings. pankaj's samples of the same phrase differ a lot from each other, and the calibration
+consistency check now flags this while recording.
+
+**Gemini in this test.** Leave-one-out has no bedside context: no care note and no recent requests. In an earlier
+run, before the hubness correction, Gemini answered 28 of the 80 calls before the free quota ran out (the rest fell
+back offline). In all 28 it kept the classifier's order, so accuracy did not change. That shows it does not make
+lip reading worse without context. Its benefit with real context has not been measured.
 
 ## API contract
 
@@ -97,7 +117,7 @@ All JSON. A frame is a flat list of floats: `[mouth blendshapes (dims.bs) | lip 
 
 | Endpoint | Request | Response |
 | --- | --- | --- |
-| `POST /api/enroll` | `{user, phrase, frames: [[...]], dims: {bs, lip}, fps}` | `{ok, id}` |
+| `POST /api/enroll` | `{user, phrase, frames: [[...]], dims: {bs, lip}, fps}` | `{ok, id, check: {matches, in_top3, looks_like}}`; 422 if the lips barely moved |
 | `GET /api/enrollments?user=` | | `{user, counts: {phrase: n}}` |
 | `DELETE /api/enrollments/last?user=` | | `{ok, deleted}` |
 | `POST /api/predict` | `{user, frames, note, local_time, use_gemini}` | `{candidates: [{phrase, distance, confidence}] (top 5), choices: [3], mode: "gemini"\|"offline", reason, timing}` |

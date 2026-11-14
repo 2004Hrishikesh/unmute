@@ -18,6 +18,7 @@ def evaluate_user(samples: list[dict], cfg: Config, with_gemini: bool = False) -
     rec = Recogniser(usable, cfg)
     n = top1 = top3 = 0
     g_top1 = g_top3 = 0
+    g_answered = g_changed = 0  # how many calls Gemini really answered / changed the order
     confusions = Counter()
     per_phrase = defaultdict(lambda: [0, 0, 0])  # n, top1, top3
     for i, s in enumerate(rec.samples):
@@ -38,6 +39,10 @@ def evaluate_user(samples: list[dict], cfg: Config, with_gemini: bool = False) -
             from . import rerank as R
 
             out = asyncio.run(R.rerank(ranked, {"time": time.strftime("%H:%M"), "history": [], "note": ""}))
+            if out["mode"] == "gemini":
+                g_answered += 1
+                if out["choices"][:3] != names[:3]:
+                    g_changed += 1
             if out["choices"] and out["choices"][0] == truth:
                 g_top1 += 1
             if truth in out["choices"][:3]:
@@ -60,6 +65,8 @@ def evaluate_user(samples: list[dict], cfg: Config, with_gemini: bool = False) -
     if with_gemini:
         res["gemini_top1"] = round(g_top1 / n, 4)
         res["gemini_top3"] = round(g_top3 / n, 4)
+        res["gemini_answered"] = g_answered  # the rest fell back to offline (classifier top 3)
+        res["gemini_changed_order"] = g_changed
     return res
 
 

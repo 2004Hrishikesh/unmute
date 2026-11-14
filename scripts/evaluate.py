@@ -35,6 +35,9 @@ def main():
     if args.sweep:
         configs = [
             Config(),
+            Config(hub_alpha=0.0),
+            Config(hub_alpha=1.0),
+            Config(hub_k=5),
             Config(k=2),
             Config(trim=False),
             Config(center=False),
@@ -42,7 +45,7 @@ def main():
             Config(bs_weight=1.0),
             Config(length=40),
             Config(window=10),
-            Config(length=40, k=2, deltas=False, center=False, trim=False, bs_weight=1.0),  # original
+            Config(length=40, k=2, deltas=False, center=False, trim=False, bs_weight=1.0, hub_alpha=0.0),  # original
         ]
         print(f"{'config':70s} top1   top3")
         for c in configs:
@@ -52,6 +55,11 @@ def main():
                 print(f"{json.dumps(c.as_dict()):70s} {o['top1']:.3f}  {o['top3']:.3f}")
         return
 
+    if args.with_gemini:
+        n = sum(len(v) for v in by_user.values())
+        print(f"Note: --with-gemini makes one Gemini request per sample ({n} requests). Free API keys have a\n"
+              f"small daily quota per model (we hit 20/day on gemini-3.6-flash), so this can use up the quota\n"
+              f"you need for a live demo. The output says how many calls Gemini really answered.")
     res = evaluate_all(by_user, Config(), with_gemini=args.with_gemini)
     RESULTS_FILE.write_text(json.dumps(res, indent=2))
     if not res["overall"]:
@@ -63,7 +71,7 @@ def main():
         line = (f"  {u}: {r['samples']} samples / {r['phrases']} phrases, top-1 {r['top1']:.1%} "
                 f"(chance {r['chance_top1']:.1%}), top-3 {r['top3']:.1%} (chance {r['chance_top3']:.1%})")
         if "gemini_top3" in r:
-            line += f", with Gemini top-1 {r['gemini_top1']:.1%} top-3 {r['gemini_top3']:.1%}"
+            line += f", with Gemini top-1 {r['gemini_top1']:.1%} top-3 {r['gemini_top3']:.1%} (Gemini answered {r['gemini_answered']}/{r['samples']}, changed the order {r['gemini_changed_order']} times)"
         print(line)
     print(f"Saved to {RESULTS_FILE.relative_to(ROOT)}")
 

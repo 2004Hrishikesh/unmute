@@ -19,7 +19,7 @@ function render(res) {
   </div>`;
   html += `<h2>Per person</h2><table><thead><tr><th>Person</th><th>Samples</th><th>Phrases</th><th>Top-1</th><th>Top-3</th><th>Chance top-1 / top-3</th>${res.with_gemini ? "<th>With Gemini top-1 / top-3</th>" : ""}</tr></thead><tbody>`;
   for (const [u, r] of Object.entries(res.users)) {
-    html += `<tr><td>${esc(u)}</td><td>${r.samples}</td><td>${r.phrases}</td><td><b>${pct(r.top1)}</b></td><td><b>${pct(r.top3)}</b></td><td class="muted">${pct(r.chance_top1)} / ${pct(r.chance_top3)}</td>${res.with_gemini ? `<td>${pct(r.gemini_top1)} / ${pct(r.gemini_top3)}</td>` : ""}</tr>`;
+    html += `<tr><td>${esc(u)}</td><td>${r.samples}</td><td>${r.phrases}</td><td><b>${pct(r.top1)}</b></td><td><b>${pct(r.top3)}</b></td><td class="muted">${pct(r.chance_top1)} / ${pct(r.chance_top3)}</td>${res.with_gemini ? `<td>${pct(r.gemini_top1)} / ${pct(r.gemini_top3)}${r.gemini_answered != null ? ` <span class="muted small">(Gemini answered ${r.gemini_answered}/${r.samples}; the rest fell back offline)</span>` : ""}</td>` : ""}</tr>`;
   }
   html += "</tbody></table>";
 
