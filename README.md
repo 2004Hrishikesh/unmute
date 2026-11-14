@@ -64,6 +64,9 @@ Unmute is a communication aid. It is not a medical device and it does not diagno
   - Carers can always use keys `1` `2` `3`, arrows + `Enter`, or a mouse click.
 - **Calibration quality check.** After each sample, Unmute checks whether it looks like the person's other samples of
   the same phrase and asks them to redo it if not. Recordings where the lips barely moved are rejected.
+- **Pre-alert before confirmation.** The moment the best guess is an urgent phrase, the nurse page and phone get a
+  "Possible (not yet confirmed)" alert (Settings toggle, on by default). The sentence the patient then confirms
+  supersedes it; a false alarm costs the nurse a glance, a missed "I cannot breathe" costs more.
 - **Bed-light check.** If the camera image is too dark, the screen says "Turn on the bed light: too dark to read lips".
 
 ## Setup
@@ -172,6 +175,10 @@ data/    phrases.json, enrollments/*.json, requests.jsonl, results.json
 ```
 
 ## Prior art and what's next
+
+See [docs/COMPETITION.md](docs/COMPETITION.md) for the researched landscape with sources (SRAVI, eye-gaze devices,
+AAC apps, open-source lip readers, other hackathon projects), [docs/PITCH.md](docs/PITCH.md) for the story,
+[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) for the 4-minute demo, and [docs/JUDGE_FAQ.md](docs/JUDGE_FAQ.md).
 
 SRAVI (Liopa) recognises a fixed list of about 40 phrases and needs Wi-Fi. Unmute learns each patient's own lips,
 uses bedside context, and runs offline. The next step is open sentences: a pretrained visual speech recognition

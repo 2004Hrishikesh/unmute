@@ -14,7 +14,7 @@ const MIN_FRAMES = 8;
 
 let state = "loading";
 let choices = [], confidences = {}, selected = 0, lastMode = null, choiceShownAt = 0;
-let calibrated = false, calInfo = null, lastRec = null;
+let calibrated = false, calInfo = null, lastRec = null, URGENT = [];
 let lastFrame = null;
 let urgentId = null, urgentPoll = null;
 let spokenTimer = null;
@@ -104,6 +104,20 @@ geminiToggle.addEventListener("change", () => settings.set("useGemini", geminiTo
 const learnToggle = $("#learnToggle");
 learnToggle.checked = settings.get("learn", true);
 learnToggle.addEventListener("change", () => settings.set("learn", learnToggle.checked));
+const preAlertToggle = $("#preAlertToggle");
+preAlertToggle.checked = settings.get("preAlert", true);
+preAlertToggle.addEventListener("change", () => settings.set("preAlert", preAlertToggle.checked));
+
+// Before the patient confirms: if the best guess is urgent, the nurse is told now, marked "possible".
+// The confirmed sentence that follows supersedes it on the nurse page. A false alarm costs a glance;
+// a missed "I cannot breathe" costs more.
+async function preAlert(sentence) {
+  if (!preAlertToggle.checked || !URGENT.includes(sentence)) return;
+  try {
+    await api("/api/log", { body: { user: settings.user, sentence, method: "possible", mode: lastMode, confirmed: false, learn: false } });
+    if (state === "choosing") reasonEl.textContent = `Nurse pre-alerted: possible "${sentence}", not confirmed yet. ` + reasonEl.textContent;
+  } catch (e) { console.warn("pre-alert failed", e); }
+}
 
 async function refreshUser() {
   const u = settings.user;
@@ -262,6 +276,7 @@ async function onRecorded(rec) {
     if (r.mode === "gemini" && r.reason) reasonEl.textContent = "Context: " + r.reason;
     if (r.mode === "offline" && r.reason) reasonEl.textContent = "Offline mode: " + r.reason;
     if (r.source === "starter") reasonEl.textContent = "Starter model (no calibration yet). " + reasonEl.textContent;
+    preAlert(choices[0]);
     renderDebug(r);
   } catch (e) {
     setState("idle", { msg: "Could not read that: " + e.message });
@@ -384,6 +399,7 @@ setInterval(() => $("#settings").open && renderDebug(), 250);
 let tracker = null, bright = null;
 async function boot() {
   applyMode();
+  api("/api/phrases").then((p) => (URGENT = p.urgent || [])).catch(() => {});
   setState("loading", { msg: "Starting camera and face tracker" });
   refreshStatus();
   // Load the face tracker while the camera starts; they don't depend on each other.
