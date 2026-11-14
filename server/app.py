@@ -184,6 +184,12 @@ class AckIn(BaseModel):
 
 # ---------------------------------------------------------------- routes
 
+@app.on_event("startup")
+def _warm_gemini():
+    # Pick and warm up the Gemini model in the background so the first prediction isn't slow.
+    threading.Thread(target=rerank.init, daemon=True).start()
+
+
 @app.get("/health")
 def health():
     return {"ok": True}
