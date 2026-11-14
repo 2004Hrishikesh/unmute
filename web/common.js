@@ -1,0 +1,330 @@
+// Shared browser code: camera, Face Landmarker, mouth features, head pose,
+// gestures, brightness check, speech, alarm and small API helpers.
+
+const MP_VERSION = "0.10.14";
+const MP_CDN = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}`;
+const MODEL_REMOTE =
+  "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+
+// Lip landmark indices from the MediaPipe face mesh (outer ring, then inner ring).
+export const OUTER_LIPS = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185];
+export const INNER_LIPS = [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191];
+const LIPS = OUTER_LIPS.concat(INNER_LIPS);
+const EYE_R = 33, EYE_L = 263; // outer eye corners
+
+// ------------------------------------------------------------------ settings
+
+export const settings = {
+  get user() { return store("unmute.user") || ""; },
+  set user(v) { store("unmute.user", v); },
+  get note() { return store("unmute.note") || ""; },
+  set note(v) { store("unmute.note", v); },
+  get(key, dflt) { const v = store("unmute." + key); return v === null || v === undefined ? dflt : JSON.parse(v); },
+  set(key, v) { store("unmute." + key, JSON.stringify(v)); },
+};
+function store(k, v) {
+  try {
+    if (v === undefined) return localStorage.getItem(k);
+    localStorage.setItem(k, v);
+  } catch { return null; }
+}
+
+// ------------------------------------------------------------------ API
+
+export async function api(path, opts = {}) {
+  const init = { method: opts.method || (opts.body ? "POST" : "GET"), headers: {} };
+  if (opts.body) { init.headers["Content-Type"] = "application/json"; init.body = JSON.stringify(opts.body); }
+  const r = await fetch(path, init);
+  let data = null;
+  try { data = await r.json(); } catch {}
+  if (!r.ok) throw new Error((data && data.detail) || `HTTP ${r.status}`);
+  return data;
+}
+
+// ------------------------------------------------------------------ face tracking
+
+async function urlExists(url) {
+  try { const r = await fetch(url, { method: "HEAD" }); return r.ok; } catch { return false; }
+}
+
+export async function createLandmarker(onStatus = () => {}) {
+  // Prefer local copies in web/vendor (fully offline); fall back to the CDN.
+  let vision, wasmBase, modelPath;
+  if (await urlExists("/vendor/face_landmarker.task") && await urlExists("/vendor/tasks-vision/vision_bundle.mjs")) {
+    onStatus("Loading face tracker (local files)…");
+    vision = await import("/vendor/tasks-vision/vision_bundle.mjs");
+    wasmBase = "/vendor/tasks-vision/wasm";
+    modelPath = "/vendor/face_landmarker.task";
+  } else {
+    onStatus("Loading face tracker…");
+    vision = await import(`${MP_CDN}/vision_bundle.mjs`);
+    wasmBase = `${MP_CDN}/wasm`;
+    modelPath = MODEL_REMOTE;
+  }
+  const fileset = await vision.FilesetResolver.forVisionTasks(wasmBase);
+  const opts = {
+    baseOptions: { modelAssetPath: modelPath, delegate: "GPU" },
+    runningMode: "VIDEO",
+    numFaces: 1,
+    outputFaceBlendshapes: true,
+    outputFacialTransformationMatrixes: true,
+  };
+  try {
+    return await vision.FaceLandmarker.createFromOptions(fileset, opts);
+  } catch (e) {
+    console.warn("GPU delegate failed, using CPU", e);
+    opts.baseOptions.delegate = "CPU";
+    return await vision.FaceLandmarker.createFromOptions(fileset, opts);
+  }
+}
+
+export async function startCamera(video) {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+    audio: false,
+  });
+  video.srcObject = stream;
+  await video.play();
+  await new Promise((res) => (video.readyState >= 2 ? res() : (video.onloadeddata = res)));
+}
+
+// Converts a Face Landmarker result into our per-frame feature vector.
+export function extractFrame(res, w, h) {
+  if (!res || !res.faceLandmarks || !res.faceLandmarks.length) return null;
+  const lm = res.faceLandmarks[0];
+  const P = (i) => [lm[i].x * w, lm[i].y * h];
+
+  // Normalise lips: centre on the mouth, undo head roll, divide by eye distance.
+  const e1 = P(EYE_R), e2 = P(EYE_L);
+  const dx = e2[0] - e1[0], dy = e2[1] - e1[1];
+  const eyeDist = Math.hypot(dx, dy) || 1;
+  const ang = -Math.atan2(dy, dx);
+  const c = Math.cos(ang), s = Math.sin(ang);
+  const pts = LIPS.map(P);
+  let cx = 0, cy = 0;
+  for (const p of pts) { cx += p[0]; cy += p[1]; }
+  cx /= pts.length; cy /= pts.length;
+  const lips = [];
+  for (const [x, y] of pts) {
+    const ux = x - cx, uy = y - cy;
+    lips.push((ux * c - uy * s) / eyeDist, (ux * s + uy * c) / eyeDist);
+  }
+
+  // Mouth blendshapes, in a fixed (alphabetical) order.
+  let bs = [], bsNames = [];
+  if (res.faceBlendshapes && res.faceBlendshapes.length) {
+    const cats = res.faceBlendshapes[0].categories
+      .filter((k) => k.categoryName.startsWith("jaw") || k.categoryName.startsWith("mouth") || k.categoryName === "cheekPuff")
+      .sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+    bs = cats.map((k) => k.score);
+    bsNames = cats.map((k) => k.categoryName);
+  }
+
+  // Head pitch / yaw (degrees) from the 4x4 transformation matrix.
+  let pitch = 0, yaw = 0;
+  const m = res.facialTransformationMatrixes && res.facialTransformationMatrixes[0];
+  if (m && m.data) {
+    const d = m.data; // sign conventions do not matter: gestures use deviation from a baseline
+    const R = (r, col) => d[col * 4 + r];
+    pitch = (Math.atan2(R(2, 1), R(2, 2)) * 180) / Math.PI;
+    yaw = (Math.asin(Math.max(-1, Math.min(1, -R(2, 0)))) * 180) / Math.PI;
+  }
+
+  const jawOpen = bsNames.length ? bs[bsNames.indexOf("jawOpen")] : 0;
+  return {
+    feat: bs.concat(lips),
+    dims: { bs: bs.length, lip: lips.length },
+    pitch, yaw, jawOpen,
+    landmarks: lm,
+  };
+}
+
+export class FaceTracker {
+  constructor(video, landmarker, onFrame) {
+    this.video = video; this.lm = landmarker; this.onFrame = onFrame;
+    this.lastTs = -1; this.running = false; this.fps = 0; this._times = [];
+  }
+  start() { this.running = true; const loop = () => { if (!this.running) return; this.tick(); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
+  stop() { this.running = false; }
+  tick() {
+    const v = this.video;
+    if (v.readyState < 2) return;
+    let ts = performance.now();
+    if (ts <= this.lastTs) ts = this.lastTs + 1;
+    this.lastTs = ts;
+    let res;
+    try { res = this.lm.detectForVideo(v, ts); } catch (e) { console.warn(e); return; }
+    this._times.push(ts); while (this._times.length && ts - this._times[0] > 1000) this._times.shift();
+    this.fps = this._times.length;
+    this.onFrame(extractFrame(res, v.videoWidth, v.videoHeight), ts);
+  }
+}
+
+// Draws the lip outline on a canvas sized to the video.
+export function drawMouth(canvas, video, frame, color = "#5eead4") {
+  const ctx = canvas.getContext("2d");
+  if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!frame) return;
+  const lm = frame.landmarks, W = canvas.width, H = canvas.height;
+  ctx.lineWidth = Math.max(2, W / 400);
+  ctx.strokeStyle = color;
+  for (const ring of [OUTER_LIPS, INNER_LIPS]) {
+    ctx.beginPath();
+    ring.forEach((i, k) => { const x = lm[i].x * W, y = lm[i].y * H; k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.closePath(); ctx.stroke();
+  }
+  ctx.fillStyle = color;
+  for (const i of LIPS) { ctx.beginPath(); ctx.arc(lm[i].x * W, lm[i].y * H, ctx.lineWidth, 0, 6.283); ctx.fill(); }
+}
+
+// ------------------------------------------------------------------ push to record
+
+// Hold Space (or the given button) to record; release to stop.
+export class PushToRecord {
+  constructor({ button, onStart, onStop, enabled = () => true }) {
+    this.recording = false; this.frames = []; this.dims = null; this.t0 = 0;
+    this.onStart = onStart; this.onStop = onStop; this.enabled = enabled;
+    window.addEventListener("keydown", (e) => {
+      if (e.code !== "Space" || e.repeat || isTyping(e)) return;
+      e.preventDefault(); this.begin();
+    });
+    window.addEventListener("keyup", (e) => {
+      if (e.code !== "Space" || isTyping(e)) return;
+      e.preventDefault(); this.end();
+    });
+    if (button) {
+      button.addEventListener("pointerdown", (e) => { e.preventDefault(); button.setPointerCapture(e.pointerId); this.begin(); });
+      button.addEventListener("pointerup", () => this.end());
+      button.addEventListener("pointercancel", () => this.end());
+    }
+  }
+  begin() {
+    if (this.recording || !this.enabled()) return;
+    unlockAudio();
+    this.recording = true; this.frames = []; this.missed = 0; this.t0 = performance.now();
+    this.onStart && this.onStart();
+  }
+  push(frame) {
+    if (!this.recording) return;
+    if (!frame) { this.missed++; return; }
+    this.frames.push(frame.feat); this.dims = frame.dims;
+  }
+  end() {
+    if (!this.recording) return;
+    this.recording = false;
+    const secs = (performance.now() - this.t0) / 1000;
+    this.onStop && this.onStop({ frames: this.frames, dims: this.dims, secs, fps: this.frames.length / Math.max(secs, 0.001), missed: this.missed });
+  }
+}
+function isTyping(e) {
+  const t = e.target;
+  return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+}
+
+// ------------------------------------------------------------------ gestures
+
+// Nod = pitch leaves the baseline and comes back within maxMs, with more pitch than yaw.
+// Shake = same, with more yaw than pitch.
+export class GestureDetector {
+  constructor(opts = {}) {
+    this.pitchT = opts.pitchT ?? 8; this.yawT = opts.yawT ?? 12;
+    this.maxMs = opts.maxMs ?? 1500; this.cooldownMs = opts.cooldownMs ?? 700;
+    this.reset();
+  }
+  reset() { this.base = null; this.moving = false; this.lastEvent = performance.now(); this.warm = 0; }
+  update(pitch, yaw, t) {
+    if (this.base === null) { this.base = { p: pitch, y: yaw }; this.warm = 0; return null; }
+    const dp = pitch - this.base.p, dy = wrap(yaw - this.base.y);
+    this.last = { dp, dy };
+    if (this.warm < 8) { // settle the baseline over a few frames first
+      this.warm++; this.base.p += 0.3 * dp; this.base.y += 0.3 * dy; return null;
+    }
+    if (!this.moving) {
+      if (Math.abs(dp) > this.pitchT || Math.abs(dy) > this.yawT) {
+        this.moving = true; this.start = t; this.maxP = 0; this.maxY = 0;
+      } else {
+        this.base.p += 0.05 * dp; this.base.y += 0.05 * dy; // follow slow drift
+        return null;
+      }
+    }
+    this.maxP = Math.max(this.maxP, Math.abs(dp)); this.maxY = Math.max(this.maxY, Math.abs(dy));
+    const back = Math.abs(dp) < this.pitchT * 0.5 && Math.abs(dy) < this.yawT * 0.5;
+    if (back) {
+      this.moving = false;
+      const quick = t - this.start <= this.maxMs;
+      if (!quick || t - this.lastEvent < this.cooldownMs) return null;
+      this.lastEvent = t;
+      return this.maxP / this.pitchT >= this.maxY / this.yawT ? "nod" : "shake";
+    }
+    if (t - this.start > this.maxMs * 1.5) { // head just moved somewhere new: re-baseline
+      this.moving = false; this.base = { p: pitch, y: yaw };
+    }
+    return null;
+  }
+}
+function wrap(a) { while (a > 180) a -= 360; while (a < -180) a += 360; return a; }
+
+// ------------------------------------------------------------------ brightness
+
+export class BrightnessCheck {
+  constructor(video, onChange, threshold = () => 55) {
+    this.video = video; this.onChange = onChange; this.threshold = threshold;
+    this.canvas = document.createElement("canvas"); this.canvas.width = 32; this.canvas.height = 24;
+    this.ctx = this.canvas.getContext("2d", { willReadFrequently: true });
+    this.dark = false; this.value = null;
+    setInterval(() => this.check(), 1000);
+  }
+  check() {
+    if (this.video.readyState < 2) return;
+    this.ctx.drawImage(this.video, 0, 0, 32, 24);
+    const d = this.ctx.getImageData(0, 0, 32, 24).data;
+    let sum = 0;
+    for (let i = 0; i < d.length; i += 4) sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    this.value = sum / (d.length / 4);
+    const dark = this.value < this.threshold();
+    if (dark !== this.dark) { this.dark = dark; this.onChange(dark, this.value); }
+  }
+}
+
+// ------------------------------------------------------------------ speech and sound
+
+export function speak(text) {
+  if (!("speechSynthesis" in window)) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = 0.92; u.pitch = 1; u.volume = 1;
+  const voices = speechSynthesis.getVoices();
+  const v = voices.find((v) => v.lang.startsWith("en") && v.localService) || voices.find((v) => v.lang.startsWith("en"));
+  if (v) u.voice = v;
+  speechSynthesis.speak(u);
+}
+
+let audioCtx = null;
+export function unlockAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch {}
+}
+export function beep(freq = 880, ms = 120, vol = 0.2) {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = "square"; o.frequency.value = freq; g.gain.value = vol;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + ms / 1000);
+}
+let alarmTimer = null;
+export function alarm(on) {
+  if (on && !alarmTimer) {
+    const play = () => { beep(988, 180, 0.25); setTimeout(() => beep(740, 180, 0.25), 220); };
+    play(); alarmTimer = setInterval(play, 900);
+  } else if (!on && alarmTimer) { clearInterval(alarmTimer); alarmTimer = null; }
+}
+
+// ------------------------------------------------------------------ misc
+
+export function $(sel) { return document.querySelector(sel); }
+export function localTimeString() {
+  return new Date().toLocaleString([], { weekday: "long", hour: "2-digit", minute: "2-digit" });
+}

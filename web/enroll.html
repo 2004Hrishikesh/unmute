@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Unmute Calibrate</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Un<span>mute</span></div>
+    <nav>
+      <a href="/">Patient</a>
+      <a href="/enroll.html" class="active">Calibrate</a>
+      <a href="/nurse.html">Nurse</a>
+      <a href="/proof.html">Proof</a>
+    </nav>
+    <div class="right"><span id="userBadge" class="badge user">no user</span></div>
+  </header>
+
+  <main class="page grid">
+    <section>
+      <div id="cam" class="cam">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <div id="darkBanner" class="dark-banner hidden">Turn on the bed light: too dark to read lips.</div>
+        <div id="recDot" class="rec-dot hidden">● REC</div>
+        <div id="camMsg" class="cam-msg">Starting camera…</div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="form">
+          <label>Your name (each person calibrates separately)
+            <input id="userInput" type="text" placeholder="e.g. alex" autocomplete="off" />
+          </label>
+          <div class="row">
+            <label>Phrases
+              <select id="setSelect">
+                <option value="demo">Demo set (10)</option>
+                <option value="all">All 20</option>
+              </select>
+            </label>
+            <label>Samples per phrase
+              <select id="targetSelect">
+                <option>3</option><option selected>4</option><option>5</option><option>6</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="muted">Silently mouth:</div>
+      <div id="phrase" class="phrase-big">…</div>
+      <div id="msg" class="substatus">Hold <kbd>Space</kbd> (or the button), mouth the phrase, let go.</div>
+      <div class="progress"><div id="bar"></div></div>
+      <div id="progressText" class="muted small"></div>
+      <button id="recordBtn" class="record-btn" disabled>Hold to record&nbsp;&nbsp;<kbd>Space</kbd></button>
+      <div class="row" style="margin-top:14px">
+        <button id="undoBtn" class="btn">Redo last</button>
+        <button id="skipBtn" class="btn">Skip phrase</button>
+        <a id="doneLink" class="btn primary hidden" href="/" style="text-decoration:none">Done: go to Patient view</a>
+      </div>
+      <div id="chips" class="chips"></div>
+      <p class="muted small">Tips: mouth at normal speed, exaggerate a little, keep your head still, start recording just
+        before you begin and let go just after. Same lighting as the demo is best.</p>
+    </section>
+  </main>
+
+  <script type="module" src="/enroll.js"></script>
+</body>
+</html>

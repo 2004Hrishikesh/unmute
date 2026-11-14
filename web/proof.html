@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Unmute Proof</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Un<span>mute</span></div>
+    <nav>
+      <a href="/">Patient</a>
+      <a href="/enroll.html">Calibrate</a>
+      <a href="/nurse.html">Nurse</a>
+      <a href="/proof.html" class="active">Proof</a>
+    </nav>
+    <div class="right"><button id="runBtn" class="btn primary">Re-run evaluation</button></div>
+  </header>
+
+  <main class="page">
+    <div class="card">
+      <h2>Measured accuracy</h2>
+      <p class="muted" id="method">Leave-one-out on the team's real calibration recordings: each sample is held out and
+        matched against that same person's other samples. Nothing on this page is estimated.</p>
+      <div id="content" class="muted">Loading…</div>
+    </div>
+  </main>
+  <script type="module" src="/proof.js"></script>
+</body>
+</html>

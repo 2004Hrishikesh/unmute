@@ -1,0 +1,13 @@
+{
+  "phrases": [
+    "I need water", "I am in pain", "Call the nurse", "Where am I", "Call my family",
+    "I am cold", "I am hot", "I need the toilet", "I cannot breathe", "Yes",
+    "No", "Thank you", "I am scared", "What time is it", "Move my pillow",
+    "I feel sick", "Turn off the light", "I am tired", "Help me", "I love you"
+  ],
+  "urgent": ["I cannot breathe", "I am in pain", "Help me", "Call the nurse", "I feel sick"],
+  "demo_set": [
+    "I need water", "I am in pain", "Call the nurse", "I cannot breathe", "Call my family",
+    "I am cold", "Yes", "No", "Thank you", "I love you"
+  ]
+}

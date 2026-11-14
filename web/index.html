@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Unmute</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Un<span>mute</span></div>
+    <nav>
+      <a href="/" class="active">Patient</a>
+      <a href="/enroll.html">Calibrate</a>
+      <a href="/nurse.html">Nurse</a>
+      <a href="/proof.html">Proof</a>
+    </nav>
+    <div class="right">
+      <span id="userBadge" class="badge user">no user</span>
+      <span id="modeBadge" class="badge">…</span>
+    </div>
+  </header>
+
+  <main class="page grid">
+    <section>
+      <div id="cam" class="cam">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <div id="darkBanner" class="dark-banner hidden">Turn on the bed light: too dark to read lips.</div>
+        <div id="recDot" class="rec-dot hidden">● REC</div>
+        <div id="camMsg" class="cam-msg">Starting camera…</div>
+      </div>
+      <button id="recordBtn" class="record-btn" disabled>Hold to record&nbsp;&nbsp;<kbd>Space</kbd></button>
+
+      <details class="settings card" id="settings">
+        <summary>Settings</summary>
+        <div class="form">
+          <label>Who is using Unmute (same name as on Calibrate)
+            <input id="userInput" type="text" placeholder="e.g. alex" autocomplete="off" />
+          </label>
+          <label>Care note for context (optional)
+            <textarea id="noteInput" placeholder="e.g. post-surgery, cannot eat yet"></textarea>
+          </label>
+          <label class="row"><input id="geminiToggle" type="checkbox" checked /> Use Gemini re-ranking with bedside context</label>
+          <label>Nod threshold (degrees): <span id="pitchTVal"></span>
+            <input id="pitchT" type="range" min="3" max="20" step="1" />
+          </label>
+          <label>Shake threshold (degrees): <span id="yawTVal"></span>
+            <input id="yawT" type="range" min="4" max="30" step="1" />
+          </label>
+          <label>Darkness threshold (0–255): <span id="darkTVal"></span>
+            <input id="darkT" type="range" min="10" max="120" step="1" />
+          </label>
+          <div id="debug" class="debug"></div>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <div id="status" class="status">Loading…</div>
+      <div id="substatus" class="substatus"></div>
+      <div id="choices" class="choices"></div>
+      <div id="spoken" class="spoken-big hidden"></div>
+      <div id="hint" class="hint"></div>
+      <div id="reason" class="reason"></div>
+    </section>
+  </main>
+
+  <div id="urgent" class="urgent hidden">
+    <p>URGENT REQUEST</p>
+    <h1 id="urgentText"></h1>
+    <p id="urgentPush">Alerting the nurse…</p>
+    <button id="urgentAck" class="btn">Nurse is here: clear alarm</button>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+web/vendor/*
+!web/vendor/.gitkeep
+data/config.json
+.DS_Store

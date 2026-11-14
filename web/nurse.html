@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Unmute Nurse</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Un<span>mute</span></div>
+    <nav>
+      <a href="/">Patient</a>
+      <a href="/enroll.html">Calibrate</a>
+      <a href="/nurse.html" class="active">Nurse</a>
+      <a href="/proof.html">Proof</a>
+    </nav>
+    <div class="right">
+      <button id="soundBtn" class="btn">Enable alarm sound</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <div id="alarmBox" class="nurse-alarm hidden">
+      <span id="alarmText"></span>
+      <button id="ackAll" class="btn">Acknowledge</button>
+    </div>
+    <div class="card">
+      <h2>Patient requests</h2>
+      <p class="muted small" id="pushInfo"></p>
+      <table>
+        <thead><tr><th>Time</th><th>Bed / user</th><th>Request</th><th>How</th><th>Status</th></tr></thead>
+        <tbody id="rows"><tr><td colspan="5" class="muted">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+  <script type="module" src="/nurse.js"></script>
+</body>
+</html>

@@ -1,0 +1,165 @@
+:root {
+  --bg: #0b1220;
+  --panel: #121b2e;
+  --panel-2: #18233a;
+  --line: #26334f;
+  --text: #eef2f8;
+  --muted: #9aa8c2;
+  --accent: #5eead4;
+  --accent-ink: #062a26;
+  --warn: #fbbf24;
+  --danger: #ef4444;
+  --ok: #4ade80;
+  --radius: 18px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body { min-height: 100vh; }
+a { color: var(--accent); }
+button { font: inherit; cursor: pointer; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+
+/* ---------- top bar */
+.topbar {
+  display: flex; align-items: center; gap: 24px; padding: 12px 24px;
+  border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.brand { font-weight: 800; font-size: 1.35rem; letter-spacing: 0.02em; }
+.brand span { color: var(--accent); }
+.topbar nav { display: flex; gap: 6px; flex-wrap: wrap; }
+.topbar nav a {
+  color: var(--muted); text-decoration: none; padding: 8px 14px; border-radius: 10px; font-weight: 600;
+}
+.topbar nav a.active, .topbar nav a:hover { color: var(--text); background: var(--panel-2); }
+.topbar .right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+.badge {
+  font-size: 0.8rem; font-weight: 700; padding: 5px 10px; border-radius: 999px;
+  background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+}
+.badge.ok { color: var(--ok); border-color: #1f5135; }
+.badge.offline { color: var(--warn); border-color: #5c4610; }
+.badge.user { color: var(--text); }
+
+/* ---------- layout */
+.page { padding: 24px; max-width: 1500px; margin: 0 auto; }
+.grid { display: grid; grid-template-columns: minmax(320px, 0.9fr) 1.3fr; gap: 24px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .page { padding: 16px; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+
+/* ---------- camera */
+.cam { position: relative; border-radius: var(--radius); overflow: hidden; background: #000; aspect-ratio: 16 / 9; }
+.cam video, .cam canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.cam .cam-msg {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; padding: 10px 14px; border-radius: 12px;
+  background: rgba(0, 0, 0, 0.65); font-weight: 600; text-align: center;
+}
+.cam .dark-banner {
+  position: absolute; left: 0; right: 0; top: 0; padding: 14px; text-align: center; font-weight: 800;
+  font-size: 1.15rem; background: var(--warn); color: #241a00;
+}
+.cam.recording { outline: 6px solid var(--danger); outline-offset: -6px; }
+.rec-dot {
+  position: absolute; top: 14px; right: 14px; padding: 6px 12px; border-radius: 999px; background: var(--danger);
+  font-weight: 800; font-size: 0.9rem; animation: pulse 1s infinite;
+}
+@keyframes pulse { 50% { opacity: 0.45; } }
+
+/* ---------- patient view */
+.status { font-size: clamp(1.8rem, 3.2vw, 2.8rem); font-weight: 800; line-height: 1.15; margin: 4px 0 6px; }
+.substatus { font-size: 1.2rem; color: var(--muted); min-height: 1.6em; }
+.choices { display: grid; gap: 14px; margin-top: 20px; }
+.choice {
+  display: flex; align-items: center; gap: 18px; width: 100%; text-align: left;
+  padding: 22px 24px; border-radius: var(--radius); border: 3px solid var(--line);
+  background: var(--panel-2); color: var(--text); font-size: clamp(1.6rem, 2.6vw, 2.3rem); font-weight: 700;
+  transition: border-color 0.15s, transform 0.15s, background 0.15s;
+}
+.choice .num {
+  flex: none; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bg); color: var(--muted); font-size: 1.4rem;
+}
+.choice .conf { margin-left: auto; font-size: 0.95rem; color: var(--muted); font-weight: 600; }
+.choice.selected { border-color: var(--accent); background: #10302f; transform: scale(1.015); }
+.choice.selected .num { background: var(--accent); color: var(--accent-ink); }
+.choice.retry { font-size: 1.3rem; color: var(--muted); padding: 14px 24px; }
+.choice.spoken { border-color: var(--ok); background: #123222; }
+.hint { margin-top: 16px; font-size: 1.1rem; color: var(--muted); }
+.hint kbd, kbd {
+  background: var(--panel-2); border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px;
+  padding: 1px 7px; font-family: inherit; font-size: 0.9em; color: var(--text);
+}
+.record-btn {
+  width: 100%; margin-top: 16px; padding: 22px; border-radius: var(--radius); border: none;
+  background: var(--accent); color: var(--accent-ink); font-size: 1.5rem; font-weight: 800;
+  user-select: none; touch-action: none;
+}
+.record-btn:active, .record-btn.on { background: var(--danger); color: white; }
+.record-btn:disabled { opacity: 0.4; }
+.spoken-big { font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 800; color: var(--ok); margin-top: 20px; }
+.reason { margin-top: 10px; font-size: 0.95rem; color: var(--muted); }
+
+/* ---------- settings drawer */
+details.settings { margin-top: 20px; }
+details.settings summary { cursor: pointer; color: var(--muted); font-weight: 600; }
+.form { display: grid; gap: 12px; margin-top: 14px; }
+.form label { display: grid; gap: 6px; font-weight: 600; color: var(--muted); font-size: 0.95rem; }
+input[type="text"], textarea, select {
+  font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px;
+}
+textarea { min-height: 70px; resize: vertical; }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.btn {
+  padding: 10px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel-2);
+  color: var(--text); font-weight: 700;
+}
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: white; }
+.debug { font-family: ui-monospace, Menlo, monospace; font-size: 0.85rem; color: var(--muted); white-space: pre; }
+
+/* ---------- urgent overlay */
+.urgent {
+  position: fixed; inset: 0; z-index: 50; background: var(--danger); color: white;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+  text-align: center; padding: 24px; animation: flash 1s infinite;
+}
+@keyframes flash { 50% { background: #b91c1c; } }
+.urgent h1 { font-size: clamp(2.4rem, 7vw, 5.5rem); margin: 0; }
+.urgent p { font-size: 1.5rem; margin: 0; }
+.urgent .btn { font-size: 1.3rem; padding: 16px 28px; background: white; color: #7f1d1d; border: none; }
+
+/* ---------- enroll */
+.phrase-big { font-size: clamp(2.4rem, 5vw, 4.2rem); font-weight: 800; margin: 10px 0; line-height: 1.1; }
+.progress { height: 14px; background: var(--panel-2); border-radius: 999px; overflow: hidden; margin: 14px 0 6px; }
+.progress > div { height: 100%; background: var(--accent); width: 0; transition: width 0.3s; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.chip {
+  padding: 6px 12px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line);
+  font-size: 0.9rem; color: var(--muted);
+}
+.chip.done { color: var(--ok); border-color: #1f5135; }
+.chip.current { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.flash-ok { color: var(--ok); font-weight: 700; }
+.flash-bad { color: var(--warn); font-weight: 700; }
+
+/* ---------- tables (nurse, proof) */
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+tr.urgent-row td { background: rgba(239, 68, 68, 0.14); }
+tr.urgent-row.open td { background: rgba(239, 68, 68, 0.35); }
+td.sentence { font-size: 1.3rem; font-weight: 700; }
+.nurse-alarm {
+  padding: 18px 22px; border-radius: var(--radius); background: var(--danger); font-size: 1.4rem; font-weight: 800;
+  display: flex; align-items: center; gap: 16px; margin-bottom: 18px; animation: flash 1s infinite;
+}
+.nurse-alarm .btn { margin-left: auto; background: white; color: #7f1d1d; border: none; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 16px 0; }
+.stat { background: var(--panel-2); border-radius: 14px; padding: 16px; }
+.stat .v { font-size: 2.2rem; font-weight: 800; }
+.stat .k { color: var(--muted); font-size: 0.9rem; }
+h2 { margin: 0 0 10px; }
+code { background: var(--panel-2); padding: 2px 6px; border-radius: 6px; }
