@@ -12,7 +12,7 @@ function render(res) {
   }
   const o = res.overall;
   let html = `<div class="stats">
-    <div class="stat"><div class="v">${pct(o.top1)}</div><div class="k">Top-1 accuracy (overall)</div></div>
+    <div class="stat"><div class="v">${pct(o.top1)}</div><div class="k">Top-1 accuracy, personal model (own recordings only)</div></div>
     <div class="stat"><div class="v">${pct(o.top3)}</div><div class="k">Top-3 accuracy: correct sentence among the 3 choices</div></div>
     <div class="stat"><div class="v">${o.samples}</div><div class="k">Held-out samples tested</div></div>
     <div class="stat"><div class="v">${Object.keys(res.users).length}</div><div class="k">People</div></div>
@@ -22,6 +22,24 @@ function render(res) {
     html += `<tr><td>${esc(u)}</td><td>${r.samples}</td><td>${r.phrases}</td><td><b>${pct(r.top1)}</b></td><td><b>${pct(r.top3)}</b></td><td class="muted">${pct(r.chance_top1)} / ${pct(r.chance_top3)}</td>${res.with_gemini ? `<td>${pct(r.gemini_top1)} / ${pct(r.gemini_top3)}${r.gemini_answered != null ? ` <span class="muted small">(Gemini answered ${r.gemini_answered}/${r.samples}; the rest fell back offline)</span>` : ""}</td>` : ""}</tr>`;
   }
   html += "</tbody></table>";
+
+  // As deployed: one pool of everyone's recordings. And with no calibration at all: other people's recordings only.
+  const pooled = res.pooled && res.pooled.users ? Object.entries(res.pooled.users) : [];
+  const starter = res.starter && res.starter.users ? Object.entries(res.starter.users) : [];
+  if (pooled.length || starter.length) {
+    html += `<h2 style="margin-top:24px">Shared starter model</h2>
+      <p class="muted">Unmute matches against everyone's recordings. "As deployed" holds each sample out of that pool.
+      "No calibration" matches a person's samples only against <i>other</i> people's recordings: what a brand-new patient gets.</p>
+      <table><thead><tr><th>Person</th><th>As deployed top-1 / top-3</th><th>No calibration top-1 / top-3</th><th>Chance top-1 / top-3</th></tr></thead><tbody>`;
+    const names = [...new Set([...pooled.map(([u]) => u), ...starter.map(([u]) => u)])];
+    for (const u of names) {
+      const p = res.pooled.users[u], s = res.starter.users[u];
+      html += `<tr><td>${esc(u)}</td><td>${p ? `<b>${pct(p.top1)}</b> / <b>${pct(p.top3)}</b> <span class="muted small">(${p.samples} samples)</span>` : "–"}</td>`
+        + `<td>${s ? `<b>${pct(s.top1)}</b> / <b>${pct(s.top3)}</b> <span class="muted small">(${s.samples} samples, ${s.phrases} phrases)</span>` : "–"}</td>`
+        + `<td class="muted">${s ? `${pct(s.chance_top1)} / ${pct(s.chance_top3)}` : "–"}</td></tr>`;
+    }
+    html += "</tbody></table>";
+  }
 
   // Most-confused pairs across users.
   const conf = {};

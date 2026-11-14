@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-14 15:46:41",
+  "generated_at": "2026-11-14 17:21:27",
   "method": "leave-one-out, per user (each sample is matched only against that user's other samples)",
   "config": {
     "length": 30,
@@ -249,6 +249,42 @@
           "count": 1
         }
       ]
+    }
+  },
+  "pooled": {
+    "method": "leave-one-out over the pooled recordings of every user (how /api/predict works)",
+    "users": {
+      "kesh": {
+        "samples": 33,
+        "top1": 0.2424,
+        "top3": 0.5455
+      },
+      "rishi": {
+        "samples": 40,
+        "top1": 0.75,
+        "top3": 0.975
+      }
+    }
+  },
+  "starter": {
+    "method": "cross-person: each user's samples matched only against other users' recordings",
+    "users": {
+      "kesh": {
+        "samples": 16,
+        "top1": 0.6875,
+        "top3": 0.9375,
+        "phrases": 10,
+        "chance_top1": 0.1,
+        "chance_top3": 0.3
+      },
+      "rishi": {
+        "samples": 40,
+        "top1": 0.35,
+        "top3": 0.6,
+        "phrases": 20,
+        "chance_top1": 0.05,
+        "chance_top3": 0.15
+      }
     }
   }
 }

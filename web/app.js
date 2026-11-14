@@ -14,7 +14,7 @@ const MIN_FRAMES = 8;
 
 let state = "loading";
 let choices = [], confidences = {}, selected = 0, lastMode = null, choiceShownAt = 0;
-let calibrated = false;
+let calibrated = false, calInfo = null, lastRec = null;
 let lastFrame = null;
 let urgentId = null, urgentPoll = null;
 let spokenTimer = null;
@@ -76,6 +76,9 @@ geminiToggle.checked = settings.get("useGemini", true);
 userInput.addEventListener("change", () => { settings.user = userInput.value.trim().toLowerCase(); refreshUser(); });
 noteInput.addEventListener("change", () => (settings.note = noteInput.value));
 geminiToggle.addEventListener("change", () => settings.set("useGemini", geminiToggle.checked));
+const learnToggle = $("#learnToggle");
+learnToggle.checked = settings.get("learn", true);
+learnToggle.addEventListener("change", () => settings.set("learn", learnToggle.checked));
 
 async function refreshUser() {
   const u = settings.user;
@@ -83,10 +86,20 @@ async function refreshUser() {
   calibrated = false;
   if (!u) { $("#settings").open = true; setState("nouser"); return; }
   try {
-    const r = await api(`/api/enrollments?user=${encodeURIComponent(u)}`);
-    calibrated = Object.keys(r.counts).length >= 2;
+    calInfo = await api(`/api/enrollments?user=${encodeURIComponent(u)}`);
+    // No calibration needed when other people's recordings exist: that is the shared starter model.
+    calibrated = calInfo.personal || calInfo.starter_available;
   } catch {}
-  setState(calibrated ? "idle" : "uncalibrated");
+  setState(calibrated ? "idle" : "uncalibrated", { msg: idleMsg() });
+}
+
+function idleMsg() {
+  if (!calInfo) return "";
+  if (!calInfo.personal) {
+    return `No calibration needed: starter model from ${calInfo.starter_samples} recordings by ${calInfo.starter_users} other `
+      + `${calInfo.starter_users === 1 ? "person" : "people"}. Unmute learns from every sentence you confirm.`;
+  }
+  return calInfo.own_from_use ? `Your model: ${calInfo.own_samples} samples, ${calInfo.own_from_use} learned from use.` : "";
 }
 
 async function refreshStatus() {
@@ -122,7 +135,7 @@ function setState(s, extra = {}) {
   if (s === "nouser") { statusEl.textContent = "Who is using Unmute?"; subEl.textContent = "Type a name in Settings (left), then calibrate."; }
   if (s === "uncalibrated") {
     statusEl.textContent = "Calibration needed";
-    subEl.innerHTML = `Unmute learns your lips in about a minute. <a href="/enroll.html">Open Calibrate</a>`;
+    subEl.innerHTML = `Nobody has calibrated on this laptop yet. <a href="/enroll.html">Open Calibrate</a> (about a minute).`;
   }
   if (s === "idle") {
     statusEl.textContent = "Mouth your sentence now";
@@ -200,6 +213,7 @@ async function onRecorded(rec) {
     return;
   }
   setState("thinking");
+  lastRec = rec;
   try {
     const r = await api("/api/predict", {
       body: {
@@ -218,6 +232,7 @@ async function onRecorded(rec) {
     startScan();
     if (r.mode === "gemini" && r.reason) reasonEl.textContent = "Context: " + r.reason;
     if (r.mode === "offline" && r.reason) reasonEl.textContent = "Offline mode: " + r.reason;
+    if (r.source === "starter") reasonEl.textContent = "Starter model (no calibration yet). " + reasonEl.textContent;
     renderDebug(r);
   } catch (e) {
     setState("idle", { msg: "Could not read that: " + e.message });
@@ -232,10 +247,15 @@ async function confirm(i, method) {
   if (sentence === RETRY) { setState("idle", { msg: "OK, try again." }); return; }
   speak(sentence);
   setState("spoken", { sentence });
-  spokenTimer = setTimeout(() => state === "spoken" && setState("idle"), 6000);
+  spokenTimer = setTimeout(() => state === "spoken" && setState("idle", { msg: idleMsg() }), 6000);
   try {
-    const row = await api("/api/log", { body: { user: settings.user, sentence, method, mode: lastMode } });
+    const learn = $("#learnToggle").checked && !!lastRec;
+    const row = await api("/api/log", { body: {
+      user: settings.user, sentence, method, mode: lastMode, learn,
+      frames: learn ? lastRec.frames : null, dims: learn ? lastRec.dims : {}, fps: learn ? lastRec.fps : null,
+    } });
     if (row.urgent) showUrgent(row);
+    if (row.learned) { try { calInfo = await api(`/api/enrollments?user=${encodeURIComponent(settings.user)}`); } catch {} }
   } catch (e) {
     console.warn("log failed", e);
   }

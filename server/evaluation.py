@@ -92,4 +92,55 @@ def evaluate_all(samples_by_user: dict[str, list[dict]], cfg: Config | None = No
         "with_gemini": with_gemini,
         "overall": overall,
         "users": users,
+        "pooled": evaluate_pooled(samples_by_user, cfg),
+        "starter": evaluate_starter(samples_by_user, cfg),
     }
+
+
+def _score(rec: Recogniser, queries: list[dict], exclude_ids: bool) -> dict | None:
+    ids = [s.get("id") for s in rec.samples]
+    n = t1 = t3 = 0
+    for q in queries:
+        ex = ids.index(q["id"]) if exclude_ids and q.get("id") in ids else None
+        names = [r["phrase"] for r in rec.rank(q["frames"], top=3, exclude=ex)]
+        n += 1
+        t1 += bool(names) and names[0] == q["phrase"]
+        t3 += q["phrase"] in names
+    if not n:
+        return None
+    return {"samples": n, "top1": round(t1 / n, 4), "top3": round(t3 / n, 4)}
+
+
+def evaluate_pooled(samples_by_user: dict[str, list[dict]], cfg: Config) -> dict:
+    """As deployed: one pool of everyone's recordings; each sample is held out and matched against
+    everything else (own and other people's)."""
+    pool = [s for ss in samples_by_user.values() for s in ss]
+    out = {"method": "leave-one-out over the pooled recordings of every user (how /api/predict works)", "users": {}}
+    if len({s["phrase"] for s in pool}) < 2:
+        return out
+    rec = Recogniser(pool, cfg)
+    for user, ss in sorted(samples_by_user.items()):
+        r = _score(rec, ss, exclude_ids=True)
+        if r:
+            out["users"][user] = r
+    return out
+
+
+def evaluate_starter(samples_by_user: dict[str, list[dict]], cfg: Config) -> dict:
+    """No calibration: each user's samples are matched only against OTHER people's recordings,
+    on the phrases those other people recorded."""
+    out = {"method": "cross-person: each user's samples matched only against other users' recordings", "users": {}}
+    for user, ss in sorted(samples_by_user.items()):
+        others = [s for u, other in samples_by_user.items() if u != user for s in other]
+        phrases = {s["phrase"] for s in others}
+        if len(phrases) < 2:
+            continue
+        rec = Recogniser(others, cfg)
+        queries = [q for q in ss if q["phrase"] in phrases]
+        r = _score(rec, queries, exclude_ids=False)
+        if r:
+            r["phrases"] = len(phrases)
+            r["chance_top1"] = round(1 / len(phrases), 4)
+            r["chance_top3"] = round(min(1.0, 3 / len(phrases)), 4)
+            out["users"][user] = r
+    return out

@@ -99,7 +99,17 @@ Teammate clicks **Acknowledge** on the Nurse page. The alarm stops on the patien
 
 > "When the nurse acknowledges it, the patient sees that help is coming."
 
-**3:15 — Proof page: measured, not promised**
+**3:00 — No calibration needed (the answer to "patients can't do this")**
+
+Open **Settings**, change the name to a new one, e.g. `judge`. Mouth **"I need water"**.
+
+> "This person has never calibrated. Unmute matches against everyone's recordings on this laptop: the shared
+> starter model. And every sentence they confirm is saved as their own sample, so it becomes personal just from
+> use. Measured: a new person got the right sentence in the three cards 94% of the time on the demo phrases."
+
+Confirm it. Point at "Starter model (no calibration yet)" under the cards. Change the name back.
+
+**3:30 — Proof page: measured, not promised**
 
 Click **Proof**.
 
@@ -110,12 +120,12 @@ Click **Proof**.
 > wrong answers. These settings were tuned on the same recordings, so we expect lower numbers on new people until
 > we re-measure. We only show what we measured."
 
-**3:45 — Close**
+**3:50 — Close**
 
-> "SRAVI recognises a fixed list from everyone's lips and needs a network. Unmute learns *your* lips in a minute,
-> understands *your* situation, works offline on any laptop, and lets you confirm with *whatever movement you still
-> have*. Next: shared starter templates so a new patient needs almost no calibration, and open vocabulary with a
-> pretrained visual speech model. Thank you."
+> "SRAVI recognises a fixed list from everyone's lips and needs a network. Unmute starts with no setup, learns
+> *your* lips from every sentence you say, understands *your* situation, works offline on any laptop, and lets you
+> confirm with *whatever movement you still have*. Next: more volunteers in the starter library, and open vocabulary
+> with a pretrained visual speech model. Thank you."
 
 ## Fallbacks: when something goes wrong on stage
 
@@ -123,6 +133,7 @@ Click **Proof**.
 | --- | --- | --- |
 | The right sentence is card 2 or 3, not card 1 | Shake your head to move, then nod. Or press **2** or **3**. | "It's in the top three; a shake moves to the next one." |
 | None of the three is right | Nod on "None of these: try again", or press **Esc**. Mouth it again, bigger and slower. | "Lip reading is hard; the patient just tries again. Nothing wrong gets spoken." |
+| The "judge" starter demo misses | Press the number of the right card, or skip it. | "Starter model, 35 to 69% first time in our measurements; each confirmed sentence makes it personal." |
 | The nod isn't detected | Press **1**. Or open Settings and lower the nod threshold. | "Carers can also press a key." |
 | The camera shows black or "Starting camera…" | Use the camera picker under the video to choose the built-in camera, then click **Retry**. | "The iPhone camera grabbed it; switching." |
 | "Face not visible" | Move so your whole face is in the frame and the light is on your face. | |

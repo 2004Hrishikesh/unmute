@@ -20,7 +20,7 @@ userInput.addEventListener("change", () => { settings.user = userInput.value.tri
 setSelect.addEventListener("change", () => { settings.set("enrollSet", setSelect.value); pickNext(); render(); });
 targetSelect.addEventListener("change", () => { settings.set("enrollTarget", +targetSelect.value); pickNext(); render(); });
 
-const phraseList = () => (setSelect.value === "demo" ? PH.demo_set : PH.phrases);
+const phraseList = () => ({ demo: PH.demo_set, quick: PH.quick_set }[setSelect.value] || PH.phrases);
 const target = () => +targetSelect.value;
 
 async function loadCounts() {

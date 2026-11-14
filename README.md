@@ -25,9 +25,17 @@ Unmute is a communication aid. It is not a medical device and it does not diagno
  └──────────────────────────────────────┘               └───────────────────────────────────────────┘
 ```
 
-- **Calibration, about a minute per person.** Each person records each phrase 3 to 5 times. There is no model training.
-  Every recording becomes a template, and a new recording is matched against them with dynamic time warping, so the
-  speed of mouthing doesn't matter.
+- **No calibration needed to start.** Unmute matches against every recording on the laptop (the shared starter
+  model), not only the patient's own. Measured cross-person on the Proof page: a new person matched only against
+  another team member's recordings of the 10 demo phrases got 69% top-1 / 94% top-3 (chance 10% / 30%); against a
+  20-phrase set, 35% / 60% (chance 5% / 15%).
+- **It learns from use.** Every confirmed sentence is saved as a personal sample of that phrase (Settings → "Learn
+  from every confirmed sentence", at most 8 per phrase). Measured: starter plus 2 personal samples per phrase gave
+  68% top-1 / 98% top-3 on rishi's other recordings; pooling other people's recordings with a calibrated person's own
+  did not hurt (75% / 95% own only, 75% / 97.5% pooled).
+- **Calibration, when someone has a minute.** "Quick start" is the 5 urgent phrases plus Yes/No (about 20 recordings);
+  the demo set is 10 phrases. There is no model training. Every recording becomes a template, and a new recording is
+  matched against them with dynamic time warping, so the speed of mouthing doesn't matter.
 - **Only numbers leave the camera.** Face tracking runs in the browser, and the server receives about 108 numbers per frame, never video.
 - **Bedside context.** Gemini sees the top 5 lip-reading candidates plus the time, the last 5 requests and an
   optional care note. It reorders them only to break near-ties, and it may only pick from the candidates.
@@ -131,10 +139,10 @@ All JSON. A frame is a flat list of floats: `[mouth blendshapes (dims.bs) | lip 
 | Endpoint | Request | Response |
 | --- | --- | --- |
 | `POST /api/enroll` | `{user, phrase, frames: [[...]], dims: {bs, lip}, fps}` | `{ok, id, check: {matches, in_top3, looks_like}}`; 422 if the lips barely moved |
-| `GET /api/enrollments?user=` | | `{user, counts: {phrase: n}}` |
+| `GET /api/enrollments?user=` | | `{user, counts, own_samples, own_from_use, personal, starter_available, starter_samples, starter_users}` |
 | `DELETE /api/enrollments/last?user=` | | `{ok, deleted}` |
-| `POST /api/predict` | `{user, frames, note, local_time, use_gemini}` | `{candidates: [{phrase, distance, confidence}] (top 5), choices: [3], mode: "gemini"\|"offline", reason, timing}` |
-| `POST /api/log` | `{user, sentence, method, mode}` | the stored row, incl. `urgent`, `push` |
+| `POST /api/predict` | `{user, frames, note, local_time, use_gemini}` | `{candidates: [{phrase, distance, confidence}] (top 5), choices: [3], mode: "gemini"\|"offline", reason, source: "personal"\|"starter", timing}` |
+| `POST /api/log` | `{user, sentence, method, mode, learn?, frames?, dims?, fps?}` | the stored row, incl. `urgent`, `push`, `learned` |
 | `GET /api/requests` | | `{requests: [...newest first], unacknowledged_urgent}` |
 | `POST /api/ack` | `{id}` (or `"all"`) | `{ok}` |
 | `GET /api/results` / `POST /api/evaluate` | | leave-one-out results |

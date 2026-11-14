@@ -19,17 +19,18 @@ between a patient and "I cannot breathe".
 The patient silently mouths a sentence at an ordinary laptop camera. Unmute reads their lips and shows the three
 most likely sentences as big cards. The patient confirms one with a nod, a button press, or a long blink, and the
 laptop says it out loud. If the sentence is urgent, the screen turns red, an alarm sounds, the nurse page lights
-up, and the nurse's phone buzzes. Unmute learns each patient's own lips in about a minute of calibration, needs no
-training data, and works with no internet.
+up, and the nurse's phone buzzes. A new patient starts from a shared starter model with no setup; every sentence
+they confirm teaches Unmute their own lips. It needs no training data and works with no internet.
 
 ## How it works, in five steps
 
 1. **Face tracking in the browser.** MediaPipe Face Landmarker runs on the laptop. Each frame becomes about 108
    numbers: 40 lip points (centred on the mouth, head tilt removed, scaled by eye distance) and 28 mouth
    blendshapes. Only these numbers go to the server. No video ever leaves the camera.
-2. **Matching against the patient's own calibration.** Every calibration recording is a template. A new recording
-   is compared with each template by dynamic time warping (DTW), so mouthing fast or slow doesn't matter. The
-   phrase with the closest template wins. There is no model training at all.
+2. **Matching against recordings.** Every recording on the laptop, the patient's own and other people's (the shared
+   starter), is a template. A new recording is compared with each template by dynamic time warping (DTW), so
+   mouthing fast or slow doesn't matter. The phrase with the closest template wins; the patient's own templates win
+   naturally once they exist, and every confirmed sentence becomes one. There is no model training at all.
 3. **Bedside context from Gemini.** The top 5 candidates go to Gemini with the time of day, the last 5 confirmed
    requests, and an optional care note ("post-surgery, nil by mouth"). Gemini may reorder the candidates to break
    near-ties. It cannot add a sentence. If it takes more than 3 seconds, or there is no key or no network, Unmute
@@ -41,10 +42,31 @@ training data, and works with no internet.
    "Help me", "Call the nurse", "I feel sick") turn the screen red, sound an alarm, mark the request red on the
    nurse page, and send a push notification to the nurse's phone through ntfy.
 
+## Does the patient have to calibrate? No.
+
+This was our biggest worry: a sick patient can't be asked to record 40 phrases. So Unmute now has three ways in,
+and all three are measured on our own recordings (Proof page, "Shared starter model"):
+
+1. **Zero calibration: the shared starter model.** Unmute matches against *everyone's* recordings on the laptop,
+   not just the patient's own. A brand-new person gets the right sentence first time 69% and in the three cards
+   94% of the time when matched only against another team member's recordings of the 10 demo phrases (kesh, 16
+   recordings; chance 10% / 30%). The other way round, against a 20-phrase set, it is 35% / 60% (rishi, 40
+   recordings; chance 5% / 15%). Not perfect, but the patient can start talking in the first minute, with no setup.
+2. **It learns from use.** Every sentence the patient confirms (nod, button, blink) is saved as a personal sample of
+   that phrase. No calibration session, just use. In a measured experiment, the starter model plus 2 personal samples
+   per phrase reached 68% top-1 and 98% top-3 on rishi's remaining recordings; 1 personal sample gave 58% / 86%.
+   Adding other people's recordings to a calibrated person's own did not hurt (rishi: 75% / 95% own only,
+   75% / 97.5% pooled).
+3. **Quick start when a nurse has two minutes.** The Calibrate page has "Quick start: 5 urgent phrases + Yes/No":
+   7 phrases, about 20 recordings. The nurse can hold the button ("tap to start, tap to stop") while the patient
+   mouths. Planned surgery and tracheostomy patients can calibrate the day before, while they still can, the way
+   voice banking works for ALS.
+
 ## What makes it different
 
-- **A personal lip model in one minute.** Unmute learns *this* patient's lips: swollen, taped, weak, or lopsided
-  mouths included. No dataset, no training, no GPU. Add a personal phrase ("Where is Priya?") in a minute.
+- **Starts with no setup, then becomes personal.** Day one: the shared starter model. Every confirmed sentence is a
+  personal sample, so Unmute learns *this* patient's lips (swollen, taped, weak, or lopsided mouths included) just
+  from being used. No dataset, no training, no GPU. Add a personal phrase ("Where is Priya?") in a minute.
 - **Context that can only reorder, never invent.** Gemini sees the bedside situation but may only choose among the
   phrases the lips produced. The lip-reading top match and any urgent phrase in the top 3 can never be removed.
   The patient always confirms before anything is spoken.
@@ -58,7 +80,7 @@ training data, and works with no internet.
 
 | | SRAVI | Unmute |
 | --- | --- | --- |
-| Who it understands | Anyone, no setup (speaker-independent) | One patient at a time, after about a minute of calibration (speaker-dependent) |
+| Who it understands | Anyone, no setup (speaker-independent) | Anyone from the shared starter, then adapts to the patient from every confirmed sentence |
 | Phrases | Fixed list of about 40 | 20 built in, any phrase can be added per patient |
 | Unusual mouths (swelling, tape, palsy) | Trained on typical speakers | Learns the patient's own mouth |
 | Needs network | Yes | No; Gemini context is optional |
@@ -67,8 +89,8 @@ training data, and works with no internet.
 | Urgent escalation | No | Red screen, alarm, nurse page, phone push |
 | Runs on | Phone app | Any laptop with a webcam, in a browser |
 
-SRAVI's strength is that it works for a new patient instantly. Unmute's strength is that it fits the patient in
-front of it. We do not claim Unmute is more accurate than SRAVI; we have not measured that.
+SRAVI's strength is a model trained on many speakers. Unmute's strength is that it fits the patient in front of
+it, and gets better the more they use it. We do not claim Unmute is more accurate than SRAVI; we have not measured that.
 
 ## Measured results
 
@@ -99,12 +121,15 @@ Caveats, said out loud:
   and no history, and Gemini kept the lip-reading order in every call it answered. That shows it does not make lip
   reading worse without context.
 - A third person, kesh, is still calibrating (26 usable recordings of 13 phrases so far, 1–2 per phrase, which is
-  too few to judge).
+  too few to judge his personal model). His recordings are what the starter-model numbers above were measured with.
+- The "starter + 2 personal samples" numbers come from one person (rishi) with one other person's recordings as
+  the starter. More people are needed before that is a general claim.
 
 ## Honest limitations
 
-- **Speaker-dependent.** Each patient calibrates. A patient who is already too unwell to calibrate needs someone
-  else's recordings, which we have not tested (see roadmap).
+- **The starter model is small.** It is built from the people who have used this laptop (two team members today).
+  Its measured accuracy for a new person ranges from 35% to 69% top-1 depending on who recorded what. More
+  volunteers make it better; that is a recording session, not a research project.
 - **Best fit is a free mouth.** A patient with a breathing tube *through the mouth* can barely move their lips.
   Unmute suits tracheostomy patients, patients just after extubation, and laryngectomy patients.
 - **Consistency matters.** Accuracy depends on mouthing the phrase the same way each time.
@@ -121,11 +146,10 @@ data.
 
 ## Roadmap
 
-1. **Shared starter templates.** Record volunteers with the same features. A new patient starts from that shared
-   library and adds one personal sample per phrase. Our features are already normalised (mouth-centred, tilt
-   removed, scaled by eye distance), so recordings from different faces are comparable.
-2. **Cross-person evaluation.** Calibrate on persons A and B, test on C. This gives a measured number for "works on
-   a stranger", next to today's "works on yourself" number.
+1. **A bigger starter library.** Record more volunteers (nurses, students) with the same features. The starter
+   model and the cross-person measurement already exist; more people make the number go up.
+2. **Measure learning from use on real patients**: how many confirmed sentences until the personal model beats
+   the starter.
 3. **Open vocabulary.** A pretrained visual speech recognition model (Auto-AVSR) gives a rough transcript; Gemini
    corrects it into three candidate sentences using the same bedside context.
 4. **Clinical validation** with speech-language therapists and ICU nurses, on real patients, before any claim about
@@ -133,5 +157,5 @@ data.
 
 ## One line to close
 
-SRAVI recognises a fixed list from everyone's lips. Unmute learns *your* lips, understands *your* situation, and
-lets you confirm with *whatever movement you still have*.
+SRAVI recognises a fixed list from everyone's lips. Unmute starts talking with no setup, learns *your* lips from
+every sentence you say, understands *your* situation, and lets you confirm with *whatever movement you still have*.

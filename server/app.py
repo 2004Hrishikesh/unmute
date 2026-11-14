@@ -105,24 +105,54 @@ def load_samples(user: str | None = None) -> dict[str, list[dict]]:
 
 
 _rec_cache: dict[str, tuple[tuple, Recogniser]] = {}
+MAX_USE_SAMPLES = 8  # per phrase per user, learned from confirmed sentences
 
 
-def _fingerprint(user: str) -> tuple:
-    files = sorted(ENROLL_DIR.glob(f"{user}__*.json"))
+def _fingerprint() -> tuple:
+    files = list(ENROLL_DIR.glob("*.json"))
     return (len(files), max((f.stat().st_mtime for f in files), default=0))
 
 
-def get_recogniser(user: str) -> Recogniser | None:
-    fp = _fingerprint(user)
-    cached = _rec_cache.get(user)
+def get_recogniser(user: str | None = None) -> Recogniser | None:
+    """One recogniser over EVERY person's recordings (the shared starter model).
+
+    Measured on our own data: a new person with no calibration gets the right sentence in the top 3
+    68-94% of the time from other people's recordings, and adding other people's recordings to a
+    calibrated person's own did not hurt (rishi: 75%/95% own only, 75%/98% pooled). The person's own
+    samples win naturally when they are closer. So there is one pool, and `user` is only kept for
+    the API shape."""
+    fp = _fingerprint()
+    cached = _rec_cache.get("*")
     if cached and cached[0] == fp:
         return cached[1]
-    samples = load_samples(user).get(user, [])
+    samples = [s for ss in load_samples().values() for s in ss]
     if len({s["phrase"] for s in samples}) < 2:
         return None
     rec = Recogniser(samples, Config())
-    _rec_cache[user] = (fp, rec)
+    _rec_cache["*"] = (fp, rec)
     return rec
+
+
+def calibration_info(user: str) -> dict:
+    """How much of the pool is this person's own, and how much is other people's (the starter)."""
+    by_user = load_samples()
+    own = by_user.get(user, [])
+    others = [s for u, ss in by_user.items() if u != user for s in ss]
+    counts: dict[str, int] = {}
+    from_use = 0
+    for s in own:
+        counts[s["phrase"]] = counts.get(s["phrase"], 0) + 1
+        from_use += s.get("source") == "use"
+    return {
+        "user": user,
+        "counts": counts,
+        "own_samples": len(own),
+        "own_from_use": from_use,
+        "personal": len(counts) >= 2,
+        "starter_available": len({s["phrase"] for s in others}) >= 2,
+        "starter_samples": len(others),
+        "starter_users": len([u for u in by_user if u != user and by_user[u]]),
+    }
 
 
 # ---------------------------------------------------------------- requests log
@@ -178,6 +208,12 @@ class LogIn(BaseModel):
     sentence: str
     method: str = "click"
     mode: str | None = None
+    # Optional: the recording behind this sentence. With learn=true it becomes a calibration sample,
+    # so a patient who never calibrated gets a personal model just by using Unmute.
+    frames: list[list[float]] | None = None
+    dims: dict = Field(default_factory=dict)
+    fps: float | None = None
+    learn: bool = True
 
 
 class AckIn(BaseModel):
@@ -216,11 +252,7 @@ def users():
 
 @app.get("/api/enrollments")
 def enrollments(user: str):
-    user = safe_user(user)
-    counts: dict[str, int] = {}
-    for s in load_samples(user).get(user, []):
-        counts[s["phrase"]] = counts.get(s["phrase"], 0) + 1
-    return {"user": user, "counts": counts}
+    return calibration_info(safe_user(user))
 
 
 @app.post("/api/enroll")
@@ -256,14 +288,15 @@ def _consistency_check(user: str, sid: str, phrase: str) -> dict | None:
     if rec is None:
         return None
     ids = [s.get("id") for s in rec.samples]
-    # With only one other sample of the phrase the comparison is too noisy to act on: say nothing yet.
-    if sid not in ids or rec.phrases.count(phrase) < 3:
+    own_same = sum(1 for s in rec.samples if s.get("user") == user and s["phrase"] == phrase)
+    # With only one other own sample of the phrase the comparison is too noisy to act on: say nothing yet.
+    if sid not in ids or own_same < 3:
         return None
     i = ids.index(sid)
     ranked = rec.rank(rec.samples[i]["frames"], top=3, exclude=i)
     names = [r["phrase"] for r in ranked]
     return {"matches": bool(names and names[0] == phrase), "in_top3": phrase in names,
-            "looks_like": names[0] if names else None, "others": rec.phrases.count(phrase) - 1}
+            "looks_like": names[0] if names else None, "others": own_same - 1}
 
 
 @app.delete("/api/enrollments/last")
@@ -282,7 +315,8 @@ async def predict(body: PredictIn):
     user = safe_user(body.user)
     rec = get_recogniser(user)
     if rec is None:
-        raise HTTPException(409, f"'{user}' has not enrolled at least 2 phrases yet. Open Calibrate first.")
+        raise HTTPException(409, "Nobody has calibrated yet, so there is no starter model. Open Calibrate first.")
+    info = calibration_info(user)
     if len(body.frames[0]) != rec.templates.shape[2] // (2 if rec.cfg.deltas else 1):
         raise HTTPException(409, "feature size does not match this user's calibration. Re-calibrate.")
     t0 = time.time()
@@ -300,6 +334,9 @@ async def predict(body: PredictIn):
         "choices": ranked["choices"],
         "mode": ranked["mode"],
         "reason": ranked.get("reason"),
+        "source": "personal" if info["personal"] else "starter",
+        "own_samples": info["own_samples"],
+        "starter_samples": info["starter_samples"],
         "timing": {"classifier_s": round(t_cls, 3), "total_s": round(time.time() - t0, 3)},
     }
 
@@ -323,10 +360,42 @@ async def log(body: LogIn):
     if urgent:
         ok, detail = await alerts.push_ntfy(NTFY_TOPIC, body.sentence, BED)
         row["push"] = detail
+    row["learned"] = _learn_from_use(user, body) if body.learn and body.frames else False
     with _lock:
         with REQUESTS_FILE.open("a") as f:
             f.write(json.dumps(row) + "\n")
     return row
+
+
+def _learn_from_use(user: str, body: LogIn) -> bool:
+    """A confirmed sentence is a labelled recording of this person's lips: keep it as a sample.
+    Only phrases from the list, only if the lips moved, at most MAX_USE_SAMPLES per phrase (oldest go)."""
+    if body.sentence not in PHRASES["phrases"] or len(body.frames) < 8:
+        return False
+    try:
+        arr = features.to_array(body.frames)
+    except ValueError:
+        return False
+    if features.lip_motion(arr, int((body.dims or {}).get("bs", 0))) < MIN_LIP_MOTION:
+        return False
+    D = len(body.frames[0])
+    if any(len(f) != D for f in body.frames):
+        return False
+    sid = f"{user}__{slug(body.sentence)}__{int(time.time() * 1000)}"
+    rec = {"id": sid, "user": user, "phrase": body.sentence, "frames": body.frames, "dims": body.dims,
+           "fps": body.fps, "created": time.time(), "source": "use", "method": body.method}
+    with _lock:
+        (ENROLL_DIR / f"{sid}.json").write_text(json.dumps(rec))
+        used = []
+        for f in ENROLL_DIR.glob(f"{user}__{slug(body.sentence)}__*.json"):
+            try:
+                if json.loads(f.read_text()).get("source") == "use":
+                    used.append(f)
+            except Exception:
+                continue
+        for f in sorted(used, key=lambda f: f.name)[:-MAX_USE_SAMPLES]:
+            f.unlink()
+    return True
 
 
 @app.get("/api/requests")

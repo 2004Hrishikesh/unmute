@@ -13,15 +13,19 @@ A neural lip reader needs thousands of speakers and days of GPU time, and still 
 DTW nearest-neighbour needs one patient and one minute. It runs on a laptop CPU in a few milliseconds per
 prediction. For a bedside tool with 10 to 20 phrases per patient, that trade is worth it.
 
-**3. Why is it speaker-dependent? Isn't that a weakness?**
-It is a trade-off. SRAVI is speaker-independent and works for a new patient instantly, which is a real strength.
-Unmute instead fits the patient in front of it: a swollen, taped, or lopsided mouth is learned, not averaged
-away. The roadmap combines both: shared starter templates from volunteers plus a few personal samples.
+**3. A sick patient can't sit through calibration. So how does this work in real life?**
+They don't have to. A new patient starts on the shared starter model: Unmute matches against every recording on the
+laptop, not just their own. Measured: the right sentence was in the three cards 94% of the time for a team member
+matched only against another member's recordings of the 10 demo phrases (69% first time; chance 30% / 10%).
+Then every sentence the patient confirms is saved as a personal sample, so the model becomes theirs just from use:
+starter plus 2 personal samples per phrase measured 98% top-3. A nurse can also do a 2-minute "quick start" of the
+5 urgent phrases plus Yes/No, holding the button for the patient.
 
 **4. How is it better than SRAVI?**
-We don't claim it is more accurate; we have not measured that. It is different: personal lips, personalisable
-phrases, bedside context that can only reorder, confirmation by nod, button, or blink, works offline, and urgent
-requests reach the nurse's phone. SRAVI has a fixed list of about 40 phrases and needs a connection.
+We don't claim it is more accurate; we have not measured that. It is different: it starts with no setup and then
+learns the patient's own lips from use, phrases can be added per patient, bedside context can only reorder,
+confirmation is by nod, button, or blink, it works offline, and urgent requests reach the nurse's phone. SRAVI has
+a fixed list of about 40 phrases, one model for everyone, and needs a connection.
 
 **5. What is the accuracy, and how did you measure it?**
 Leave-one-out per person: each calibration recording is held out and matched against that person's other
@@ -56,15 +60,17 @@ calls and never changed the order, which is right when there is no context; its 
 measured yet.
 
 **11. How long does calibration take?**
-About a minute for the 10-phrase demo set at 4 samples each, two to three minutes for 20 phrases. Each recording is
-hold Space, mouth, release. Unmute checks each one against the previous ones and asks for a redo if it looks like a
-different phrase.
+Zero if the laptop already has other people's recordings: the patient just starts, and confirmed sentences become
+their calibration. Quick start (5 urgent phrases + Yes/No, 3 each) is about two minutes. The full 10-phrase demo
+set at 6 samples each is about six minutes. More samples measured better: 2 per phrase 51% top-1, 3 gave 64%,
+4 gave 75%.
 
 **12. How would you get more data and make it generalise?**
 Not from SRAVI; their data is proprietary. Public datasets (GRID, LRW, LRS2/LRS3) have different vocabularies and
-need licences. Our plan: record volunteers with the same normalised features to build a shared starter library,
-measure cross-person accuracy (calibrate on A and B, test on C), and let a new patient add one sample per phrase.
-Calibrating before planned surgery, the way voice banking works, is the other route.
+need licences. Our route is already built and measured: the shared starter library grows with every volunteer who
+records on the laptop (features are normalised for face size and tilt, so different faces are comparable), and the
+cross-person number on the Proof page shows how good it is for a stranger. Patients having planned surgery can
+record the day before, the way voice banking works.
 
 **13. Is this a medical device?**
 No. Unmute is a communication aid. It does not diagnose, treat, or monitor anything. The patient confirms every
@@ -75,6 +81,7 @@ A laptop with a webcam and a browser. The software is free: Python, FastAPI, Med
 optional and has a free tier. An assistive switch for patients who can't nod costs tens of dollars.
 
 **15. What is next?**
-Shared starter templates and cross-person evaluation; open vocabulary using a pretrained visual speech model
-(Auto-AVSR) whose rough transcript Gemini corrects into candidates; and validation with speech-language therapists
-and ICU nurses before any claim about care.
+A bigger starter library from volunteers; measuring how many confirmed sentences a real patient needs before their
+personal model beats the starter; open vocabulary using a pretrained visual speech model (Auto-AVSR) whose rough
+transcript Gemini corrects into candidates; and validation with speech-language therapists and ICU nurses before
+any claim about care.
