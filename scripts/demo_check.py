@@ -56,7 +56,12 @@ else:
     line("WARN", "Face tracker will load from the internet (web/vendor is empty)",
          "run: bash scripts/fetch_vendor.sh   (22 MB, once)")
 
-enr = get(f"/api/enrollments?user={presenter}")["counts"]
+info = get(f"/api/enrollments?user={presenter}")
+enr = info["counts"]
+if info.get("starter_available"):
+    line("OK", f"Starter model: {info['starter_samples']} recordings from {info['starter_users']} other people, so a new name works with no calibration")
+else:
+    line("WARN", "No starter model: nobody else has recorded on this laptop", "the 'judge' moment in the demo script needs at least one other person's recordings")
 phrases = get("/api/phrases")
 demo = phrases["demo_set"]
 if not enr:
