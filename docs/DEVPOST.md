@@ -41,17 +41,22 @@ may not render them).
 5. Optional: a still of the Patient page with the 3 cards, taken from your demo video or with Cmd+Shift+4 in Brave.
    Don't upload the Nurse page as it is: it shows the ntfy topic name, which would let anyone read or send alerts.
 
-## Demo video: shot list (aim for 2 minutes, record with Cmd+Shift+5, microphone on)
+## Demo video: shot list (2 minutes)
 
-| Time | Show | Say |
+Narrate only in "Can see and touch a screen" mode (hold Space to record): in the hands-free modes, talking moves
+your lips and starts a recording. Use your own name in Settings. Best phrases for kesh and rishi: I need water,
+I am in pain, Call my family, No (rishi: also I cannot breathe; kesh: also Help me).
+
+| Time | Do | Say |
 | --- | --- | --- |
-| 0:00 | Cover image, or your face | "After throat surgery or a tracheostomy, ICU patients can move their lips but can't make a sound. Nurses guess. Unmute reads their lips." |
-| 0:15 | Patient page, Settings → "Can nod, not use hands". Mouth **"I need water"**, nod | "No button: it starts when my lips move. No calibration. I nod, and it speaks." |
-| 0:40 | Mouth **"I cannot breathe"**, nod. Show the red screen, the Nurse page and the phone | "Urgent sentences sound an alarm and buzz the nurse's phone, even before the patient confirms." |
-| 1:00 | Mouth "Thank you". If it's wrong, drag the round button, tap it, tap the sentence | "When it's wrong, there's always a way out, and the correction teaches it this patient's lips." |
-| 1:20 | Settings → "Can only blink". Mouth **"No"**, close your eyes on the lit card | "Touch, nod, one switch, or a blink: whatever the patient can still move." |
-| 1:35 | Proof page | "Tested on people it never saw, with no setup: the right sentence is in the 3 cards 87% of the time. An open-source lip reader runs on this laptop's GPU." |
-| 1:50 | Turn Wi-Fi off, mouth one more | "No internet needed. The video never leaves the laptop." |
-| 2:00 | Cover | "Unmute." |
+| 0:00 | Patient page, your face on camera | "After a tracheostomy, ICU patients can move their lips but can't make a sound, so nurses guess. This is Unmute: it reads silent lips, offline, on this laptop." |
+| 0:15 | "Watch." Hold Space, silently mouth **I need water**, let go, press 1 | "Three cards. I pick one, and it's spoken out loud." |
+| 0:35 | "Now an emergency." Hold Space, mouth **I am in pain**, let go, press 1. Hold the phone up to the camera | "Urgent requests turn the screen red, sound an alarm and buzz the nurse's phone." |
+| 0:55 | Tap the round touch button, tap **Call my family** | "If it's ever wrong, there's always a way out, and every correction teaches it this patient's lips." |
+| 1:10 | Say "For a patient who can only blink:", then Settings → **Can only blink**. **Silent from here:** mouth **No**, close your eyes about 1 s on the lit card. Switch back to touch mode before speaking | (silent) |
+| 1:30 | Wi-Fi off from the menu bar. Hold Space, mouth **Call my family**, let go, press 1 | "No internet: it still works, and the video never leaves this laptop." |
+| 1:45 | Proof page | "Tested on people it never saw, with no setup: the right sentence is in the 3 cards 87% of the time, with an open-source lip reader running on this laptop's GPU. That's Unmute." |
 
-Upload to YouTube as **Unlisted**, then paste the link into "Video demo link".
+Record with Cmd+Shift+5 → Record Selected Portion (around Brave) → Options → Microphone: MacBook Pro Microphone. Do
+2-3 takes, keep the best, trim the ends in QuickTime (Cmd+T). Wi-Fi back on, then YouTube → Upload → Visibility:
+Unlisted → paste the link in Devpost. Don't show the Nurse page (its header shows the ntfy topic name).
