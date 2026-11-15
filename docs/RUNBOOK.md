@@ -43,7 +43,7 @@ Start the server (leave this terminal open):
 cd /Users/hrishi_xox/Fall_2026/Miscellaneous/project_hackathon
 .venv/bin/uvicorn server.app:app --reload --port 8000
 ```
-If it says the port is in use, a server is already running: just use it, or stop it with `lsof -ti :8000 | xargs kill`.
+If it says the port is in use, a server is already running: just use it, or stop it with `lsof -ti tcp:8000 -sTCP:LISTEN | xargs kill` (only the server, not the browser).
 
 In a second terminal, everything before the demo in one go (tests, accuracy, training, lip reader, readiness check):
 ```bash
