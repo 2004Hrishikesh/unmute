@@ -1,0 +1,89 @@
+## Inspiration
+
+Every day, ICU patients wake up unable to make a sound. A tracheostomy tube in the neck, or surgery on the throat, takes their voice away for days or weeks. **But their lips still move.** So they mouth words at the nurse, and the nurse guesses: _"Water? Pain? Your family?"_ When the guess is wrong, the patient tries again, gets tired, and gives up. Letter boards need a steady hand. Writing needs strength they don't have.
+
+We wanted the simplest possible thing: an ordinary laptop on the bed table that **reads their lips, says the sentence out loud, and gets the nurse when it matters.** No setup, no internet, no special hardware.
+
+## What it does
+
+1. The patient **silently mouths a sentence** at the laptop camera. Hands-free: recording starts when the lips move and stops when they rest.
+2. **Three big cards** show the most likely of 20 bedside sentences: "I need water", "I am in pain", "Call my family", "I cannot breathe" and so on.
+3. The patient picks one with **whatever they can still move: a touch, a nod, one switch, or a long blink.** The nurse sets this up with one question: "What can this patient do?"
+4. The laptop **says the sentence out loud.**
+5. **Urgent sentences escalate:** a red screen, an alarm, the Nurse page, and a push to the nurse's phone. The nurse is told "possible, not yet confirmed" the moment the cards appear.
+6. **When it's wrong, there's always a way out.** A movable touch button opens every sentence, for the patient or the nurse. Every correction teaches Unmute this patient's lips.
+7. **Something not on the list?** The lip reader's own reading appears as an extra card, only when it is sure. It is never spoken without a confirm.
+8. **Dark room at 3 a.m.?** The screen becomes a soft light on the face, so the camera can still see the lips.
+
+**Private and offline: the video never leaves the laptop.**
+
+- The server listens on **127.0.0.1 only**, so nothing on the network can reach it.
+- The browser sends it numbers per frame, plus small mouth pictures while the lip reader is on. They are processed in memory and **never saved** for a patient.
+- **Only two things may go to the internet, and both are optional short text:** the candidate sentences to Gemini, and "Bed 7: I am in pain" to the nurse's phone. **A test captures both and checks that they hold no picture, no face numbers and no name.**
+- **With Wi-Fi off, everything still works:** lip reading, cards, speech, the alarm and the Nurse page. Only the phone push needs a network, and ntfy is open source, so a hospital can run it on its own network.
+
+## How we built it
+
+```
+camera
+  -> MediaPipe face tracking, in the browser
+       -> 108 numbers per frame (+ a small mouth picture while the lip reader is on)
+  -> local server on the same laptop (127.0.0.1 only)
+       -> DTW matcher over everyone's recordings
+       -> Auto-AVSR lip reader on the laptop's GPU
+       -> blend -> top 5 -> Gemini reorders by bedside context (optional, text only)
+  -> 3 big cards -> touch / nod / switch / blink
+  -> spoken out loud + Nurse page + nurse's phone (urgent only)
+```
+
+- **Face tracking in the browser.** MediaPipe Face Landmarker turns each frame into about 108 numbers: lip points (centred, head tilt removed, scaled by eye distance) plus 28 mouth blendshapes.
+- **Matcher, no training.** Every recording is a template. A new one is compared with all of them by dynamic time warping, so mouthing fast or slow doesn't matter. A hubness correction stops a few "average" templates from winning everything. Every confirmed sentence becomes a new template for that patient.
+- **Open-source lip reader, offline.** Auto-AVSR (Imperial College London, Apache 2.0) has 250M parameters, was trained on 3,291 hours of video, and runs on the laptop's own GPU (PyTorch on Apple MPS). Instead of asking it "what did they say?", we ask it how likely each of the 20 phrases is (decoder + CTC scoring). That turned out to be far more reliable than free text. We blend it with the matcher, with the weight \\(w\\) measured on our own silent mouthing (it came out at \\(w = 0.25\\)):
+
+$$\log P(\text{phrase}) = w \cdot \log P^{\text{lip reader}} + (1-w) \cdot \log P^{\text{matcher}}$$
+
+- **Gemini as a careful second opinion.** Gemini gets the top 5 candidates, the time of day, the last 5 requests and an optional care note ("post-surgery, nil by mouth"), and may reorder them to break near-ties. Its answer comes back as JSON. **Safety rules are enforced in code:** Gemini can only choose from the candidates, and it can never remove the top lip-reading match or an urgent phrase. If it takes more than 3 seconds, or there is no network, Unmute uses the lip-reading order and shows "offline mode".
+- **Accessibility inputs.** Nod and shake are detected from head pose and a long blink from the eye blendshapes. There is switch scanning, and hands-free start and stop from lip motion.
+- **Nurse side.** A Nurse page with an alarm and a red/green request log, plus ntfy push notifications to the nurse's phone.
+- **76 automated tests,** including accuracy floors on our real recordings and a privacy test.
+
+## Challenges we ran into
+
+- **Silent mouthing is not speech.** The lip reader learned from people talking out loud, and nobody could tell us whether it would read _silent_ mouthing. So we measured it on 240 of our own silent recordings: 83.3% in the 3 cards, with zero training.
+- **Our own rule was wrong, and measuring caught it.** Our first rule put the lip reader's free text first whenever it was more likely than any list phrase. On real mouthing, that would have put a wrong sentence on card 1 in **124 of 240** recordings, because its reading is usually a near miss ("called my family"). The new rule hides near misses: **4 of 240**.
+- **A model that looked great, until more people.** We trained our own small neural network on volunteers' recordings. With 2 people it beat the matcher; with 4 it didn't, so our training script **switched it off by itself**. We only ship what measures better.
+- **People are different.** One volunteer's recordings matched each other far less well than anyone else's (43.8% first card, against 69-81% for the others). So we report results per person.
+- **Weak patients.** A patient may not be able to calibrate, press anything, or even nod. That is why there are four ways to pick a card, a hands-free countdown, and a touch board the nurse can use too.
+- **Engineering.** The lip reader's CTC scorer didn't run on Apple GPUs (a one-line device fix). Our DTW matcher used memory quadratic in the number of recordings, so we made it block-wise. And a dark ICU room meant using the screen as a light.
+
+## Accomplishments that we're proud of
+
+**Measured, not guessed.** We tested on **people the system had never seen**, with **no calibration**, on 240 silent recordings of the 20 phrases. Chance is 5% for the first card and 15% for the 3 cards.
+
+- Matcher alone (other people's recordings): **37.9%** first card, **65.0%** in the 3 cards
+- Open-source lip reader alone, zero-shot: **66.7%** first card, **83.3%** in the 3 cards
+- **Lip reader + matcher, what runs for a brand-new patient: 71.3% first card, 87.1% in the 3 cards**
+- After the patient has used it (their own samples) + lip reader: **78.3%** first card, **93.8%** in the 3 cards
+
+The lip reader takes about 0.7 seconds per sentence on an M5 Pro laptop. The cards appear about 1-2 seconds after the lips stop. Every number is on the app's Proof page and is re-computed by one script.
+
+- A brand-new patient, with **no setup at all**, gets the right sentence in the 3 cards **87% of the time** (out of 20 sentences).
+- **Fully offline** on an ordinary laptop, with a 250-million-parameter lip reader running on the laptop's own GPU.
+- **Usable by anyone, whatever they can still move:** touch, nod, one switch, or a blink.
+- **Every claim is backed by a test or a measured number,** including the ones that told us we were wrong.
+
+## What we learned
+
+- **Test on people the model has never seen.** Testing on the same person flattered every number we had.
+- **Asking a big model "which of these 20?" beats asking it "what did they say?"** Scoring a fixed list of phrases was far more reliable than free text.
+- **Accessibility is mostly about the last step.** For a weak patient, picking a card is harder than the AI is for us.
+- **Put the LLM where it is safe:** reordering, with hard rules in code, and never inventing a sentence.
+
+## What's next for Unmute
+
+- Test with speech-language pathologists and real tracheostomy patients.
+- More volunteers, more languages, and fine-tuning the lip reader on silent mouthing.
+- Sentences the care team can add for each patient.
+- Integration with hospital nurse-call systems, and a tablet version for the bed rail.
+
+_Unmute is a communication aid. It is not a medical device, and it does not diagnose anything._
