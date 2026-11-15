@@ -36,7 +36,8 @@ Unmute is a communication aid. It is not a medical device and it does not diagno
 - **Calibration, when someone has a minute.** "Quick start" is the 5 urgent phrases plus Yes/No (about 20 recordings);
   the demo set is 10 phrases. There is no model training. Every recording becomes a template, and a new recording is
   matched against them with dynamic time warping, so the speed of mouthing doesn't matter.
-- **Only numbers leave the camera.** Face tracking runs in the browser, and the server receives about 108 numbers per frame, never video.
+- **Nothing leaves the laptop.** Face tracking runs in the browser. The matcher gets about 108 numbers per frame; the
+  open-source lip reader also gets a small lower-face picture per frame, processed by the server on the same laptop.
 - **Bedside context.** Gemini sees the top 5 lip-reading candidates plus the time, the last 5 requests and an
   optional care note. It reorders them only to break near-ties, and it may only pick from the candidates.
   **Safety rule, enforced in code:** Gemini can never remove the lip-reading top match, or an urgent phrase in the
@@ -175,6 +176,28 @@ The dip at 1 is kesh's 10 phrases nobody else recorded: their first match is aga
 phrase were recorded one after another, so this is a little optimistic. Urgent phrases as deployed (pooled,
 held out): 86.5% top-1, 97.3% top-3 over 37 recordings.
 
+## Open-source lip reader (Auto-AVSR): no calibration, any sentence
+
+`server/avsr.py` runs [Auto-AVSR](https://github.com/mpc001/auto_avsr) (Ma et al., ICASSP 2023, Imperial College
+London, Apache 2.0): a 250M-parameter model trained on 3,291 hours of people talking, 20.3% word error rate on the
+LRS3 lip-reading benchmark. It runs on this laptop's GPU (PyTorch MPS) with no internet. Install once:
+`bash scripts/fetch_avsr.sh` (1 GB into `third_party/`, gitignored; checks the published checksum; patches one
+line so the authors' CTC scorer runs on Apple GPUs).
+
+- **Phrase scoring.** For every phrase on the list, the model's probability that these lips said exactly that
+  sentence (decoder + CTC, the authors' 0.9 / 0.1 mix). Blended with the matcher; phrases nobody has recorded can
+  still be read. Measured on this M5 Pro: 0.05-0.3 s.
+- **Free text.** Beam search for anything not on the list, shown as an extra "lip reader heard" card, never spoken
+  by itself. Only shown when the model is confident: on garbage input it still writes TED-talk filler at -1.6 to
+  -1.9 log-probability per word piece, so the cutoff is -0.8. About 1.1-1.3 s.
+- **What the browser sends.** For this model the browser sends a 192 x 192 JPEG of the lower face per frame plus 4
+  key points to the local server (same laptop), which aligns it the way the model was trained (mean-face
+  similarity transform, 96 x 96 mouth crop, 25 fps). Nothing goes to the internet. Calibration recordings keep their
+  aligned mouth crops in `data/crops/` (gitignored: face images) so `scripts/eval_avsr.py` can measure the reader on
+  our own mouths and save the blend weight to `data/avsr_config.json`.
+- **Not measured yet on our mouths.** Until `eval_avsr.py` has 20+ recordings with crops, the blend weight is 0.5.
+  Silent mouthing differs from speech, which the model was trained on; measure before you quote a number.
+
 ## Trained on many people (for patients who can't record anything)
 
 A patient may be too weak to calibrate, correct, or confirm many sentences. For them Unmute has a model trained on
@@ -205,7 +228,7 @@ patient's own samples take over after. The fusion weight was picked on the same 
 people that is optimistic, and it gets fairer with every volunteer. The trained model is gitignored (`data/model/`):
 run `train.py` on a fresh checkout.
 
-**Tests.** `.venv/bin/python -m pytest -q` (64 tests). `tests/test_real_accuracy.py` runs on the real recordings in
+**Tests.** `.venv/bin/python -m pytest -q` (69 tests). `tests/test_real_accuracy.py` runs on the real recordings in
 `data/enrollments` when present and fails if accuracy drops below floors set just under the measured numbers.
 
 ## API contract

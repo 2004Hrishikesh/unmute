@@ -8,3 +8,6 @@ data/config.json
 .DS_Store
 data/gemini_state.json
 data/model/
+third_party/
+data/crops/
+data/avsr_config.json

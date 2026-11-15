@@ -22,6 +22,12 @@ let spokenTimer = null;
 // confirmation can be fixed (relabelled) instead of teaching the model the wrong phrase.
 let lastLearnedId = null, lastLogId = null, lastConfirmAt = 0, PHRASES = [];
 let atOpen = false;
+// Open-source lip reader: free-text reading of the last recording, offered as an extra card.
+let heard = null, lipReader = { installed: false };
+const lipToggle = $("#lipToggle");
+lipToggle.checked = settings.get("lipReader", true);
+lipToggle.addEventListener("change", () => { settings.set("lipReader", lipToggle.checked); applyLipReader(); });
+function applyLipReader() { if (tracker) tracker.captureMouth = lipReader.installed && lipToggle.checked; }
 const FIX_WINDOW_MS = 60000;
 
 // ---------------------------------------------------------------- settings UI
@@ -149,6 +155,12 @@ function idleMsg() {
 async function refreshStatus() {
   try {
     const s = await api("/api/status");
+    lipReader = s.lip_reader || { installed: false };
+    applyLipReader();
+    const lb = $("#lipBadge");
+    lb.classList.toggle("hidden", !lipReader.installed);
+    lb.textContent = lipToggle.checked ? `lip reader on${lipReader.device ? " · " + lipReader.device.toUpperCase() : ""}` : "lip reader off";
+    lb.className = "badge " + (lipToggle.checked && lipReader.installed ? "ok" : "") + (lipReader.installed ? "" : " hidden");
     const b = $("#modeBadge");
     if (lastMode === "offline" || !s.gemini.available || !geminiToggle.checked) {
       b.textContent = "offline mode"; b.className = "badge offline";
@@ -208,12 +220,13 @@ function renderChoices() {
     switch: "Press the button when the right one lights up",
     blink: "Close your eyes for a moment when the right one lights up",
   }[mode()];
-  const opts = choices.concat([RETRY]);
+  const opts = options();
   choicesEl.innerHTML = "";
   opts.forEach((c, i) => {
     const b = document.createElement("button");
-    b.className = "choice" + (i === selected ? " selected" : "") + (c === RETRY ? " retry" : "");
+    b.className = "choice" + (i === selected ? " selected" : "") + (c === RETRY ? " retry" : "") + (c === heard ? " heard" : "");
     if (c === RETRY) b.textContent = c;
+    else if (c === heard) { b.innerHTML = `<span class="num">💬</span><span></span><span class="conf">lip reader heard</span>`; b.children[1].textContent = `“${c}”`; }
     else {
       b.innerHTML = `<span class="num">${i + 1}</span><span></span>`;
       b.children[1].textContent = c;
@@ -234,8 +247,11 @@ function renderChoices() {
     : "Or press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>, arrows + <kbd>Enter</kbd>, <kbd>Esc</kbd> to retry.";
 }
 
+// The 3 cards, then the open lip reader's free text (when it read something not on the list), then "try again".
+function options() { return choices.concat(heard ? [heard] : [], [RETRY]); }
+
 function moveSelection(delta, auto = false) {
-  const n = choices.length + 1;
+  const n = options().length;
   selected = (selected + delta + n) % n;
   beep(auto ? 520 : 660, 60, auto ? 0.06 : 0.12);
   renderChoices();
@@ -265,12 +281,14 @@ async function onRecorded(rec) {
     const r = await api("/api/predict", {
       body: {
         user: settings.user, frames: rec.frames, dims: rec.dims, note: settings.note,
+        crops: lipToggle.checked && rec.crops ? rec.crops : null,
         local_time: localTimeString(), use_gemini: geminiToggle.checked,
       },
     });
     lastMode = r.mode;
     refreshStatus();
     choices = r.choices;
+    heard = r.heard || null;
     confidences = Object.fromEntries(r.candidates.map((c) => [c.phrase, c.confidence]));
     selected = 0;
     choiceShownAt = performance.now();
@@ -291,10 +309,11 @@ async function onRecorded(rec) {
 
 async function confirm(i, method) {
   if (state !== "choosing") return;
-  const opts = choices.concat([RETRY]);
+  const opts = options();
   const sentence = opts[i];
   if (sentence === undefined) return;
   if (sentence === RETRY) { setState("idle", { msg: "OK, try again." }); nudgeTouch(); return; }
+  if (sentence === heard) { await sayAndLog(sentence, method, null, { learn: false }); return; } // free text: not a list phrase
   await sayAndLog(sentence, method, i);
 }
 
@@ -587,6 +606,7 @@ async function boot() {
   try {
     const lm = await lmPromise;
     tracker = new FaceTracker(video, lm, onFrame);
+    applyLipReader();
     tracker.start();
     lmReady = true;
   } catch (e) {

@@ -286,6 +286,22 @@ export class FaceTracker {
     this.lastTs = -1; this.running = false; this.fps = 0; this._times = [];
     // Dark room: >1 brightens the image the face tracker sees (the camera feed itself is untouched).
     this.gain = 1; this._canvas = null; this._ctx = null;
+    // Open-source lip reader: when on, every frame also carries a 192 x 192 JPEG of the lower face plus 4 key
+    // points (eyes, nose, mouth), which the server aligns the way the model was trained. Stays on this laptop.
+    this.captureMouth = false; this._mc = null;
+  }
+  _mouth(src, lm, W, H) {
+    if (!this._mc) { this._mc = document.createElement("canvas"); this._mc.width = this._mc.height = 192; this._mctx = this._mc.getContext("2d"); }
+    const P = (i) => [lm[i].x * W, lm[i].y * H];
+    const avg = (ids) => { let x = 0, y = 0; for (const i of ids) { x += lm[i].x * W; y += lm[i].y * H; } return [x / ids.length, y / ids.length]; };
+    const re = avg([33, 133]), le = avg([263, 362]), nose = P(1), mouth = avg(LIPS); // person's right eye = image left
+    const ed = Math.hypot(le[0] - re[0], le[1] - re[1]) || 1;
+    const cx = 0.6 * mouth[0] + 0.2 * (re[0] + le[0]), cy = 0.6 * mouth[1] + 0.2 * (re[1] + le[1]);
+    const side = 3.2 * ed, x0 = cx - side / 2, y0 = cy - side / 2, s = 192 / side;
+    const c = this._mctx;
+    c.fillStyle = "#000"; c.fillRect(0, 0, 192, 192);
+    c.drawImage(src, x0, y0, side, side, 0, 0, 192, 192);
+    return { img: this._mc.toDataURL("image/jpeg", 0.9), kp: [re, le, nose, mouth].map((p) => [(p[0] - x0) * s, (p[1] - y0) * s]) };
   }
   _source(v) {
     if (this.gain <= 1.01) return v;
@@ -305,10 +321,14 @@ export class FaceTracker {
     if (ts <= this.lastTs) ts = this.lastTs + 1;
     this.lastTs = ts;
     let res;
-    try { res = this.lm.detectForVideo(this._source(v), ts); } catch (e) { console.warn(e); return; }
+    const src = this._source(v);
+    try { res = this.lm.detectForVideo(src, ts); } catch (e) { console.warn(e); return; }
     this._times.push(ts); while (this._times.length && ts - this._times[0] > 1000) this._times.shift();
     this.fps = this._times.length;
-    this.onFrame(extractFrame(res, v.videoWidth, v.videoHeight), ts);
+    const frame = extractFrame(res, v.videoWidth, v.videoHeight);
+    if (frame) frame.ts = ts;
+    if (frame && this.captureMouth) { try { frame.crop = this._mouth(src, frame.landmarks, v.videoWidth, v.videoHeight); } catch (e) { console.warn(e); } }
+    this.onFrame(frame, ts);
   }
 }
 
@@ -360,7 +380,7 @@ export class PushToRecord {
   begin() {
     if (this.recording || !this.enabled()) return;
     unlockAudio();
-    this.recording = true; this.frames = []; this.missed = 0; this.t0 = performance.now();
+    this.recording = true; this.frames = []; this.crops = { imgs: [], kp: [], ts: [] }; this.missed = 0; this.t0 = performance.now();
     clearTimeout(this._cap);
     this._cap = setTimeout(() => this.end(), MAX_RECORD_S * 1000); // a stuck switch never records forever
     this.onStart && this.onStart();
@@ -369,13 +389,15 @@ export class PushToRecord {
     if (!this.recording) return;
     if (!frame) { this.missed++; return; }
     this.frames.push(frame.feat); this.dims = frame.dims;
+    if (frame.crop) { this.crops.imgs.push(frame.crop.img); this.crops.kp.push(frame.crop.kp); this.crops.ts.push(frame.ts); }
   }
   cancel() { this.recording = false; clearTimeout(this._cap); this.frames = []; }
   end() {
     if (!this.recording) return;
     this.recording = false; clearTimeout(this._cap);
     const secs = (performance.now() - this.t0) / 1000;
-    this.onStop && this.onStop({ frames: this.frames, dims: this.dims, secs, fps: this.frames.length / Math.max(secs, 0.001), missed: this.missed });
+    const crops = this.crops && this.crops.imgs.length >= 10 ? this.crops : null;
+    this.onStop && this.onStop({ frames: this.frames, dims: this.dims, secs, fps: this.frames.length / Math.max(secs, 0.001), missed: this.missed, crops });
   }
 }
 function isTyping(e) {

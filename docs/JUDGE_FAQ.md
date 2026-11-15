@@ -125,3 +125,12 @@ their own recordings; once they have some, their own samples win. Every voluntee
 can be hands-free (the first card speaks itself after a countdown) or a long blink, so a weak patient needs no hands.
 Honest limit: a patient with a tube in the mouth can't move their lips enough; Unmute is for tracheostomy and
 post-surgery patients whose lips are free.
+
+**20. Do you use a real pretrained lip-reading model?**
+
+Yes: Auto-AVSR from Imperial College London (open source, Apache 2.0), trained on 3,291 hours of video, 20.3% word
+error rate on the standard LRS3 benchmark. It runs on the laptop's GPU, offline, and needs no calibration and no
+training from us. We ask it how likely each phrase on the list is (fast and much more reliable than free text), blend
+that with the patient's own recordings, and also show its free-text reading as an extra card when it is confident.
+Honest limits: it was trained on people speaking aloud, and silent mouthing looks different; we measure it on our own
+mouths with `scripts/eval_avsr.py` before quoting a number. A patient always confirms before anything is spoken.

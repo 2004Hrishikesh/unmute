@@ -14,12 +14,14 @@ import time
 import uuid
 from pathlib import Path
 
+import numpy as np
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import alerts, features, neural, rerank
+from . import alerts, avsr, features, neural, rerank
 from .classifier import Config, Recogniser
 from .evaluation import evaluate_all
 
@@ -30,6 +32,10 @@ REQUESTS_FILE = DATA / "requests.jsonl"
 RESULTS_FILE = DATA / "results.json"
 CONFIG_FILE = DATA / "config.json"
 MODEL_PATH = DATA / "model" / "lipnet"  # .npz + .json, written by scripts/train.py (gitignored)
+CROPS_DIR = DATA / "crops"              # aligned 96x96 mouth crops per calibration recording (gitignored: face images)
+AVSR_CONFIG = DATA / "avsr_config.json" # lip-reader weight measured by scripts/eval_avsr.py
+AVSR_DEFAULT_WEIGHT = 0.5               # used until eval_avsr.py has measured one on our own recordings
+_avsr_lock = threading.Lock()           # one lip-reader pass at a time on the GPU
 ENROLL_DIR.mkdir(parents=True, exist_ok=True)
 ENV_FILE = ROOT / ".env"
 
@@ -212,6 +218,62 @@ def rank_with_model(rec: Recogniser, frames, dims: dict | None, personal: bool) 
     return [{"phrase": p, "distance": dist[p], "confidence": round(c, 4)} for p, c in fused[:5]], "model+matcher"
 
 
+# ---------------------------------------------------------------- open-source lip reader (Auto-AVSR)
+
+def decode_crops(c: dict | None) -> np.ndarray | None:
+    """Browser crops -> (T, 96, 96) aligned mouth crops at 25 fps, or None."""
+    if not c or not avsr.available():
+        return None
+    import base64
+
+    import cv2
+
+    imgs, kp, ts = c.get("imgs") or [], c.get("kp") or [], c.get("ts") or []
+    n = min(len(imgs), len(kp), len(ts))
+    if n < 10:
+        return None
+    idx = avsr.resample_fps(list(range(n)), ts[:n])
+    frames, points = [], []
+    for i in idx:
+        try:
+            raw = base64.b64decode(imgs[i].split(",", 1)[-1])
+            g = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_GRAYSCALE)
+        except Exception:
+            g = None
+        if g is None:
+            continue
+        frames.append(g)
+        points.append(np.asarray(kp[i], dtype=np.float64).reshape(4, 2))
+    if len(frames) < 10:
+        return None
+    return avsr.mouth_crops(frames, np.stack(points))
+
+
+def avsr_weight() -> tuple[float, bool]:
+    """(weight of the lip reader in the blend, measured?)"""
+    try:
+        cfg = json.loads(AVSR_CONFIG.read_text())
+        return float(cfg["weight"]), True
+    except Exception:
+        return AVSR_DEFAULT_WEIGHT, False
+
+
+def blend_with_lip_reader(ranked: list[dict], lip: dict, weight: float) -> list[dict]:
+    """Every phrase on the list is scored by the lip reader, including phrases nobody has recorded. The matcher's
+    distances (when it has the phrase) are blended in: weight = trust in the lip reader."""
+    p_lip = lip["proba"]
+    p_dtw = neural.dtw_proba(ranked, 0.05) if ranked else {}
+    out = []
+    for ph, pl in p_lip.items():
+        pd = p_dtw.get(ph, 1e-3) if p_dtw else 1.0
+        out.append((ph, weight * np.log(pl + 1e-9) + (1 - weight) * np.log(pd + 1e-9)))
+    v = np.array([x for _, x in out])
+    w = np.exp(v - v.max()); w /= w.sum()
+    dist = {r["phrase"]: r["distance"] for r in ranked}
+    order = sorted(zip([p for p, _ in out], w), key=lambda kv: -kv[1])
+    return [{"phrase": p, "distance": dist.get(p), "confidence": round(float(c), 4)} for p, c in order]
+
+
 def calibration_info(user: str) -> dict:
     """How much of the pool is this person's own, and how much is other people's (the starter)."""
     by_user = load_samples()
@@ -272,12 +334,14 @@ class EnrollIn(BaseModel):
     frames: list[list[float]] = Field(min_length=2)
     dims: dict = Field(default_factory=dict)
     fps: float | None = None
+    crops: dict | None = None  # {imgs: [jpeg data URLs], kp: [[4 x [x, y]]], ts: [ms]} when the lip reader is installed
 
 
 class PredictIn(BaseModel):
     user: str
     frames: list[list[float]] = Field(min_length=2)
     dims: dict = Field(default_factory=lambda: {"bs": 28, "lip": 80})
+    crops: dict | None = None
     note: str = ""
     local_time: str = ""
     use_gemini: bool = True
@@ -321,6 +385,17 @@ class AckIn(BaseModel):
 def _warm_gemini():
     # Pick and warm up the Gemini model in the background so the first prediction isn't slow.
     threading.Thread(target=rerank.init, daemon=True).start()
+    if avsr.available() and not os.environ.get("UNMUTE_NO_AVSR"):
+        threading.Thread(target=_warm_avsr, daemon=True).start()
+
+
+def _warm_avsr():
+    """Load the lip reader and run it once on a blank clip, so the first patient doesn't wait ~5 s."""
+    try:
+        with _avsr_lock:
+            avsr.read_lips(np.zeros((30, 96, 96), np.uint8), PHRASES["phrases"][:3])
+    except Exception:
+        pass
 
 
 @app.get("/health")
@@ -331,7 +406,9 @@ def health():
 @app.get("/api/status")
 def status():
     rerank.init()
-    return {"gemini": rerank.status(), "ntfy_topic": NTFY_TOPIC, "bed": BED, "model": model_info()}
+    weight, measured = avsr_weight()
+    return {"gemini": rerank.status(), "ntfy_topic": NTFY_TOPIC, "bed": BED, "model": model_info(),
+            "lip_reader": {**avsr.status(), "weight": weight, "weight_measured": measured}}
 
 
 @app.get("/api/model")
@@ -383,6 +460,13 @@ def enroll(body: EnrollIn):
         "created": time.time(),
     }
     (ENROLL_DIR / f"{sid}.json").write_text(json.dumps(rec))
+    try:
+        crops = decode_crops(body.crops)
+        if crops is not None:
+            CROPS_DIR.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(CROPS_DIR / f"{sid}.npz", crops=crops)
+    except Exception:
+        pass  # the lip reader's test data is a bonus; never fail a calibration over it
     return {"ok": True, "id": sid, "check": _consistency_check(user, sid, body.phrase)}
 
 
@@ -430,6 +514,26 @@ async def predict(body: PredictIn):
     t0 = time.time()
     candidates, recogniser = await asyncio.to_thread(rank_with_model, rec, body.frames, body.dims, info["personal"])
     t_cls = time.time() - t0
+    heard, lip_timing = None, None
+    lips_moved = features.lip_motion(features.to_array(body.frames), int((body.dims or {}).get("bs", 28))) >= MIN_LIP_MOTION
+    if body.crops and lips_moved and avsr.available():
+        try:
+            crops = await asyncio.to_thread(decode_crops, body.crops)
+            if crops is not None:
+                def run():
+                    with _avsr_lock:
+                        return avsr.read_lips(crops, PHRASES["phrases"])
+                lip = await asyncio.to_thread(run)
+                ranked_all = await asyncio.to_thread(rec.rank, body.frames, 999)
+                weight, _ = avsr_weight()
+                candidates = blend_with_lip_reader(ranked_all, lip, weight)[:5]
+                recogniser = "lip reader+" + recogniser
+                lip_timing = {**lip["timing"], "text": lip["text"], "text_conf": lip["text_conf"]}
+                text = lip["text"].strip()
+                if lip["text_shown"] and text.lower().rstrip(".") not in {p.lower() for p in PHRASES["phrases"]}:
+                    heard = text[:120]
+        except Exception as e:
+            lip_timing = {"error": f"{type(e).__name__}: {e}"[:200]}
     history = [
         {"sentence": r["sentence"], "ago": _ago(r["ts"])}
         for r in reversed(read_requests())
@@ -444,6 +548,8 @@ async def predict(body: PredictIn):
         "reason": ranked.get("reason"),
         "source": "personal" if info["personal"] else "starter",
         "recogniser": recogniser,
+        "heard": heard,
+        "lip_reader": lip_timing,
         "own_samples": info["own_samples"],
         "starter_samples": info["starter_samples"],
         "timing": {"classifier_s": round(t_cls, 3), "total_s": round(time.time() - t0, 3)},

@@ -17,6 +17,7 @@
     </nav>
     <div class="right">
       <span id="userBadge" class="badge user">no user</span>
+      <span id="lipBadge" class="badge hidden">lip reader</span>
       <span id="modeBadge" class="badge">…</span>
     </div>
   </header>
@@ -43,6 +44,7 @@
             <textarea id="noteInput" placeholder="e.g. post-surgery, cannot eat yet"></textarea>
           </label>
           <label class="row"><input id="geminiToggle" type="checkbox" checked /> Use Gemini re-ranking with bedside context</label>
+          <label class="row"><input id="lipToggle" type="checkbox" checked /> Use the open-source lip reader (Auto-AVSR, runs on this laptop; reads any sentence, no calibration)</label>
           <label class="row"><input id="learnToggle" type="checkbox" checked /> Learn from every confirmed sentence (no calibration needed)</label>
           <label class="row"><input id="preAlertToggle" type="checkbox" checked /> Pre-alert the nurse the moment the best guess is urgent, before confirmation</label>
           <label>How does the patient confirm a choice?

@@ -99,7 +99,7 @@ const ptr = new PushToRecord({
     busy = true;
     try {
       const said = current;
-      const r = await api("/api/enroll", { body: { user: settings.user, phrase: said, frames: rec.frames, dims: rec.dims, fps: rec.fps } });
+      const r = await api("/api/enroll", { body: { user: settings.user, phrase: said, frames: rec.frames, dims: rec.dims, fps: rec.fps, crops: rec.crops } });
       counts[said] = (counts[said] || 0) + 1;
       beep(1046, 90, 0.12);
       const c = r.check;
@@ -163,12 +163,16 @@ async function boot() {
   try { lm = await lmPromise; }
   catch (e) { msgEl.textContent = "Face tracker failed to load (needs internet once, or run scripts/fetch_vendor.sh): " + e.message; return; }
   lmReady = true;
-  new FaceTracker(video, lm, (frame) => {
+  const ft = new FaceTracker(video, lm, (frame) => {
     drawMouth(overlay, video, frame, ptr.recording ? "#f87171" : "#5eead4");
     ptr.push(frame);
     camMsg.textContent = frame ? "" : "Face the camera";
     camMsg.classList.toggle("hidden", !!frame);
-  }).start();
+  });
+  ft.start();
+  // Save mouth crops with each calibration recording when the lip reader is installed: they let
+  // scripts/eval_avsr.py measure it on our own mouths.
+  api("/api/status").then((s) => { ft.captureMouth = !!(s.lip_reader && s.lip_reader.installed); }).catch(() => {});
   new BrightnessCheck(video, (dark) => $("#darkBanner").classList.toggle("hidden", !dark), () => settings.get("darkT", 55));
   ready = camera.ok; render();
 }

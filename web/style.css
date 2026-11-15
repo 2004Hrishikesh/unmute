@@ -238,6 +238,9 @@ body.facelight::after {
   border-radius: 14px; background: #10302f; border: 1px solid var(--accent); }
 .volunteer .btn { margin-left: auto; }
 
+.choice.heard { font-style: italic; border-style: dashed; }
+.choice.heard .conf { font-style: normal; }
+
 /* ---------- proof: learning curve */
 .curve { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 14px; margin: 14px 0 6px; }
 .curve-col { background: var(--panel-2); border-radius: 14px; padding: 14px; text-align: center; }
