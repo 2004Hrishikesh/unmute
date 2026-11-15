@@ -1,0 +1,81 @@
+UNMUTE DEMO VIDEO: WORD FOR WORD (about 2.5 minutes)
+
+SAY = read out loud.  DO = do it.
+Use your own name in Settings. "What can this patient do?" = Can see and touch a screen
+(hold Space to record, so talking won't start a recording).
+
+PHRASES (measured on your own recordings, right on the first card)
+  Kesh:  I need water 100% | I am in pain 100% | Call my family 100% | Help me 100% | No 100%
+         planned error: I am scared (40%)
+  Rishi: I need water 100% | I cannot breathe 100% | I am in pain 100% | Call my family 100% | No 100%
+         planned error: Thank you (25%)
+
+BEFORE YOU PRESS RECORD
+  - Do Not Disturb on. Zoom and FaceTime closed. Volume about 70%.
+  - Light in front of your face. Click the page once so it can play sound.
+  - Nurse page: Acknowledge all. Don't show the Nurse page on video (its header shows the alert topic).
+  - Phone: ntfy app open, to show the buzz.
+  - Record: Cmd+Shift+5 > Record Selected Portion > Options > Microphone: MacBook Pro Microphone > Record.
+
+
+0:00  THE PROBLEM   (Patient page, your face on camera)
+SAY: Imagine waking up in the ICU after throat surgery. Your mind is clear. Your lips move. But no sound comes out.
+SAY: The nurse leans in and guesses. Water? Pain? Your family? For patients with a tracheostomy, that is every day.
+SAY: So we built Unmute. It reads silent lips with an ordinary laptop camera, and speaks for the patient.
+
+0:20  WHAT WE BUILT IT WITH   (optional: show docs/gallery/6-how.jpg)
+SAY: Google's MediaPipe tracks the lips right in the browser.
+SAY: An open-source lip reader from Imperial College London, trained on over three thousand hours of video, runs on this laptop's own GPU.
+SAY: We combine it with a matcher that learns each patient's lips. And Gemini adds bedside context, like the time of day, as a careful second opinion.
+SAY: The video never leaves this laptop. It even works with the Wi-Fi off.
+
+0:45  DEMO 1: AN EVERYDAY REQUEST
+SAY: Let me show you. I'll mouth a sentence, with no sound at all.
+DO:  Hold Space, silently mouth "I need water", let go.
+SAY: Three big cards, best guess first.
+DO:  Press 1. Wait for the laptop to speak.
+SAY: One tap, and it's spoken out loud.
+
+1:05  DEMO 2: AN EMERGENCY
+SAY: Now an emergency.
+DO:  Hold Space, mouth "I am in pain" (Rishi: "I cannot breathe"), let go, press 1. Hold your phone up to the camera.
+SAY: Urgent requests turn the screen red, sound an alarm, and buzz the nurse's phone. The nurse knows the moment the cards appear.
+
+1:25  DEMO 3: WHEN IT GETS IT WRONG
+SAY: Lip reading isn't perfect. So here's a hard one.
+DO:  Hold Space, mouth "I am scared" (Rishi: "Thank you"), let go. Then:
+  IF IT'S CARD 2 OR 3:   press that number.
+     SAY: It's not first, but it's on the screen, so I just pick it.
+     SAY: And that correction is saved. Next time, Unmute knows my lips.
+  IF IT'S NOT ON THE CARDS:   tap the round button, tap the sentence.
+     SAY: Not there at all? The touch board is always one tap away, for the patient or the nurse.
+     SAY: And that correction is saved. Next time, Unmute knows my lips.
+  IF IT GOT IT RIGHT:   press 1, then tap the round button and close it with Esc.
+     SAY: It got it. And when it doesn't, the touch board is always one tap away.
+
+1:50  DEMO 4: HANDS-FREE, WITH A BLINK   (cut this if you're running long)
+SAY: Some patients can't use their hands, or even nod. For them:
+DO:  Settings > What can this patient do? > Can only blink.
+     STAY SILENT NOW (talking moves your lips and starts a recording).
+DO:  Mouth "No". When the "No" card lights up, close both eyes for about a second.
+DO:  After it speaks, switch back to Can see and touch a screen. Then talk.
+SAY: A long blink is enough. Touch, a nod, one switch, or a blink: whatever the patient can still move.
+
+2:10  THE RESULT   (Proof page)
+SAY: We measured it on people it had never seen, with no setup.
+SAY: Out of twenty sentences, the right one is in the top three cards 87 percent of the time.
+
+2:25  WHAT'S NEXT, AND CLOSE   (your face on camera)
+SAY: Where we can improve: today Unmute knows twenty bedside sentences, and reading anything beyond them is still rough. We've tested it on our team and volunteers, not on patients yet.
+SAY: Next, we want to test it with speech therapists and real tracheostomy patients, train the lip reader on silent mouthing, add more languages, and connect it to hospital nurse-call systems.
+SAY: Unmute. Because every patient deserves to be heard.
+
+
+IF SOMETHING GOES WRONG
+  Mouth big and slow; hold Space for the whole sentence. If any step other than Demo 3 goes wrong,
+  stop and redo the take. Two or three takes, keep the best. Running long? Cut Demo 4 and the diagram.
+
+AFTER RECORDING
+  1. Trim the start and end in QuickTime: Cmd+T.
+  2. Wi-Fi on. YouTube > Create > Upload video > Visibility: Unlisted.
+  3. Paste the link into Devpost > "Video demo link" > Save. Before 9:00 AM.
