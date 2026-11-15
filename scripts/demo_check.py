@@ -62,6 +62,12 @@ if info.get("starter_available"):
     line("OK", f"Starter model: {info['starter_samples']} recordings from {info['starter_users']} other people, so a new name works with no calibration")
 else:
     line("WARN", "No starter model: nobody else has recorded on this laptop", "the 'judge' moment in the demo script needs at least one other person's recordings")
+mi = st.get("model") or {}
+if mi.get("active"):
+    line("OK", f"Many-people model on: {mi['samples']} recordings from {mi['people']} people, trained {mi['trained_at']}")
+else:
+    line("WARN", "Many-people model off (not trained, or it did not beat the matcher)",
+         "record volunteers (Calibrate -> Volunteer), then: .venv/bin/python scripts/train.py")
 phrases = get("/api/phrases")
 demo = phrases["demo_set"]
 if not enr:

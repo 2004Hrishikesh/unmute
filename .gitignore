@@ -7,3 +7,4 @@ web/vendor/*
 data/config.json
 .DS_Store
 data/gemini_state.json
+data/model/

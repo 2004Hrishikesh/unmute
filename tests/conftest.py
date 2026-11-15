@@ -30,6 +30,8 @@ def isolated_data(tmp_path, monkeypatch):
     monkeypatch.setattr(appmod, "REQUESTS_FILE", tmp_path / "requests.jsonl")
     monkeypatch.setattr(appmod, "RESULTS_FILE", tmp_path / "results.json")
     appmod._rec_cache.clear()
+    monkeypatch.setattr(appmod, "MODEL_PATH", tmp_path / "model" / "lipnet")
+    appmod._model_cache.update(mtime=None, net=None)
 
     monkeypatch.setattr(rerank, "STATE_FILE", None)
     monkeypatch.setattr(rerank, "_client", None)

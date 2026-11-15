@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import alerts, features, rerank
+from . import alerts, features, neural, rerank
 from .classifier import Config, Recogniser
 from .evaluation import evaluate_all
 
@@ -29,6 +29,7 @@ ENROLL_DIR = DATA / "enrollments"
 REQUESTS_FILE = DATA / "requests.jsonl"
 RESULTS_FILE = DATA / "results.json"
 CONFIG_FILE = DATA / "config.json"
+MODEL_PATH = DATA / "model" / "lipnet"  # .npz + .json, written by scripts/train.py (gitignored)
 ENROLL_DIR.mkdir(parents=True, exist_ok=True)
 ENV_FILE = ROOT / ".env"
 
@@ -164,6 +165,53 @@ def _rebuild_in_background():
     threading.Thread(target=run, daemon=True).start()
 
 
+_model_cache: dict = {"mtime": None, "net": None}
+
+
+def get_model() -> neural.LipNet | None:
+    """The many-people model from scripts/train.py, reloaded when the file changes. None if there is none,
+    or if its leave-one-person-out test said the matcher alone is better."""
+    f = MODEL_PATH.with_suffix(".json")
+    try:
+        mtime = f.stat().st_mtime
+    except OSError:
+        _model_cache.update(mtime=None, net=None)
+        return None
+    if _model_cache["mtime"] != mtime:
+        try:
+            _model_cache.update(mtime=mtime, net=neural.LipNet.load(MODEL_PATH))
+        except Exception:
+            _model_cache.update(mtime=mtime, net=None)
+    net = _model_cache["net"]
+    return net if net is not None and net.meta.get("use") else None
+
+
+def model_info() -> dict:
+    net = get_model()
+    if net is None:
+        return {"active": False}
+    m = net.meta
+    return {"active": True, "people": len(m.get("users", [])), "samples": m.get("samples"), "phrases": len(net.phrases),
+            "best": m.get("best"), "alpha": m.get("alpha"), "for_calibrated": m.get("use_for_calibrated", False),
+            "trained_at": m.get("trained_at")}
+
+
+def rank_with_model(rec: Recogniser, frames, dims: dict | None, personal: bool) -> tuple[list[dict], str]:
+    """Top 5 candidates. With a deployed model: the matcher's per-phrase distances fused with the model's
+    probabilities, at the weight leave-one-person-out testing picked. People with their own recordings only
+    get the fusion if the training script measured that it doesn't hurt them."""
+    net = get_model()
+    if net is None or (personal and not net.meta.get("use_for_calibrated")):
+        return rec.rank(frames, top=5), "matcher"
+    ranked = rec.rank(frames, top=999)
+    try:
+        fused = neural.fuse(net.proba(frames, dims), neural.dtw_proba(ranked, net.meta["tau"]), net.meta["alpha"])
+    except ValueError:
+        return ranked[:5], "matcher"
+    dist = {r["phrase"]: r["distance"] for r in ranked}
+    return [{"phrase": p, "distance": dist[p], "confidence": round(c, 4)} for p, c in fused[:5]], "model+matcher"
+
+
 def calibration_info(user: str) -> dict:
     """How much of the pool is this person's own, and how much is other people's (the starter)."""
     by_user = load_samples()
@@ -229,6 +277,7 @@ class EnrollIn(BaseModel):
 class PredictIn(BaseModel):
     user: str
     frames: list[list[float]] = Field(min_length=2)
+    dims: dict = Field(default_factory=lambda: {"bs": 28, "lip": 80})
     note: str = ""
     local_time: str = ""
     use_gemini: bool = True
@@ -282,7 +331,17 @@ def health():
 @app.get("/api/status")
 def status():
     rerank.init()
-    return {"gemini": rerank.status(), "ntfy_topic": NTFY_TOPIC, "bed": BED}
+    return {"gemini": rerank.status(), "ntfy_topic": NTFY_TOPIC, "bed": BED, "model": model_info()}
+
+
+@app.get("/api/model")
+def model_report():
+    """The trained model's leave-one-person-out report (Proof page), whether or not it was deployed."""
+    f = MODEL_PATH.with_suffix(".json")
+    if not f.exists():
+        return {"report": None}
+    info = json.loads(f.read_text())
+    return {"report": info.get("meta"), "phrases": info.get("phrases")}
 
 
 @app.get("/api/phrases")
@@ -369,7 +428,7 @@ async def predict(body: PredictIn):
     if len(body.frames[0]) != rec.templates.shape[2] // (2 if rec.cfg.deltas else 1):
         raise HTTPException(409, "feature size does not match this user's calibration. Re-calibrate.")
     t0 = time.time()
-    candidates = await asyncio.to_thread(rec.rank, body.frames, 5)
+    candidates, recogniser = await asyncio.to_thread(rank_with_model, rec, body.frames, body.dims, info["personal"])
     t_cls = time.time() - t0
     history = [
         {"sentence": r["sentence"], "ago": _ago(r["ts"])}
@@ -384,6 +443,7 @@ async def predict(body: PredictIn):
         "mode": ranked["mode"],
         "reason": ranked.get("reason"),
         "source": "personal" if info["personal"] else "starter",
+        "recogniser": recogniser,
         "own_samples": info["own_samples"],
         "starter_samples": info["starter_samples"],
         "timing": {"classifier_s": round(t_cls, 3), "total_s": round(time.time() - t0, 3)},

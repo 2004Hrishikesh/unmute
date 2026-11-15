@@ -26,6 +26,13 @@
       <div id="content" class="muted">Loading…</div>
     </div>
     <div class="card" style="margin-top:20px">
+      <h2>Trained on many people: a brand-new patient</h2>
+      <p class="muted">Leave-one-person-out: the model is trained on everyone except one person, then tested on that person,
+        exactly like a patient on day one. Compared on the same recordings with the matcher alone. From
+        <code>scripts/train.py</code>.</p>
+      <div id="model" class="muted">Loading…</div>
+    </div>
+    <div class="card" style="margin-top:20px">
       <h2>In real use</h2>
       <p class="muted">From the request log: for every sentence the patient confirmed, was it on the first card, among the 3 cards,
         or did they have to pick it on the touch board? Corrections count against the lip reading.</p>

@@ -264,7 +264,7 @@ async function onRecorded(rec) {
   try {
     const r = await api("/api/predict", {
       body: {
-        user: settings.user, frames: rec.frames, note: settings.note,
+        user: settings.user, frames: rec.frames, dims: rec.dims, note: settings.note,
         local_time: localTimeString(), use_gemini: geminiToggle.checked,
       },
     });
@@ -280,7 +280,8 @@ async function onRecorded(rec) {
     startAutoConfirm();
     if (r.mode === "gemini" && r.reason) reasonEl.textContent = "Context: " + r.reason;
     if (r.mode === "offline" && r.reason) reasonEl.textContent = "Offline mode: " + r.reason;
-    if (r.source === "starter") reasonEl.textContent = "Starter model (no calibration yet). " + reasonEl.textContent;
+    if (r.source === "starter") reasonEl.textContent = (r.recogniser === "model+matcher"
+      ? "Model trained on many people (no calibration yet). " : "Starter model (no calibration yet). ") + reasonEl.textContent;
     preAlert(choices[0]);
     renderDebug(r);
   } catch (e) {

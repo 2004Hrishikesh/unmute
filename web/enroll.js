@@ -20,8 +20,12 @@ userInput.addEventListener("change", () => { settings.user = userInput.value.tri
 setSelect.addEventListener("change", () => { settings.set("enrollSet", setSelect.value); pickNext(); render(); });
 targetSelect.addEventListener("change", () => { settings.set("enrollTarget", +targetSelect.value); pickNext(); render(); });
 
+// Volunteer: someone healthy records every phrase a few times for the many-people model (scripts/train.py).
+// Mixed order on purpose: varied takes teach the model more than the same take repeated.
+const volunteer = () => setSelect.value === "volunteer";
 const phraseList = () => ({ demo: PH.demo_set, quick: PH.quick_set }[setSelect.value] || PH.phrases);
-const target = () => +targetSelect.value;
+const target = () => (volunteer() ? 3 : +targetSelect.value);
+const orderMode = () => (volunteer() ? "mixed" : orderSelect.value);
 
 async function loadCounts() {
   const u = settings.user;
@@ -39,7 +43,7 @@ function pickNext(skip = false) {
   const list = phraseList();
   const need = list.filter((p) => (counts[p] || 0) < target());
   if (!need.length) { current = null; return; }
-  if (orderSelect.value === "block" && !skip) {
+  if (orderMode() === "block" && !skip) {
     if (current && need.includes(current)) return;
     const n = list.length;
     for (let k = 1; k <= n; k++) { const p = list[(lastIndex + k) % n]; if (need.includes(p)) { current = p; lastIndex = list.indexOf(p); return; } }
@@ -64,7 +68,10 @@ function render() {
   if (!settings.user) { phraseEl.textContent = "Type your name first"; }
   else if (current) phraseEl.textContent = `“${current}”`;
   else { phraseEl.textContent = "Calibration complete ✓"; msgEl.innerHTML = "Unmute has learned your lips. Try it on the Patient view."; }
-  $("#doneLink").classList.toggle("hidden", !!current);
+  $("#doneLink").classList.toggle("hidden", !!current || volunteer());
+  targetSelect.disabled = orderSelect.disabled = volunteer();
+  $("#volunteerBox").classList.toggle("hidden", !(volunteer() && settings.user && !current));
+  if (volunteer() && settings.user && !current) phraseEl.textContent = "All done ✓";
   recordBtn.disabled = !ready || !settings.user || !current;
   const chips = $("#chips"); chips.innerHTML = "";
   for (const p of list) {
@@ -107,6 +114,7 @@ const ptr = new PushToRecord({
           + (c ? (c.matches ? " · matches your other samples ✓" : " · close to your other samples") : "");
       }
       pickNext(); render();
+      if (!current) refreshPool();
     } catch (e) {
       msgEl.innerHTML = `<span class="flash-bad">Save failed: ${e.message}</span>`;
     } finally { busy = false; }
@@ -123,11 +131,26 @@ $("#undoBtn").addEventListener("click", async () => {
   } catch (e) { msgEl.textContent = "Nothing to undo."; }
 });
 $("#skipBtn").addEventListener("click", () => { pickNext(true); render(); });
+$("#nextVolunteer").addEventListener("click", () => {
+  settings.user = ""; userInput.value = ""; current = null; loadCounts(); refreshPool();
+  msgEl.textContent = "Next volunteer: type your name (any nickname), then start.";
+  userInput.focus();
+});
+async function refreshPool() {
+  try {
+    const u = await api("/api/users");
+    const people = Object.keys(u).length, recs = Object.values(u).reduce((a, b) => a + b, 0);
+    const line = `Shared pool: ${recs} recordings from ${people} ${people === 1 ? "person" : "people"}. `
+      + "More different people = better for patients who can't record. Then run scripts/train.py.";
+    $("#poolLine").textContent = line; $("#poolText").textContent = line;
+  } catch {}
+}
 window.addEventListener("keydown", unlockAudio);
 
 async function boot() {
   PH = await api("/api/phrases");
   await loadCounts();
+  refreshPool();
   const lmPromise = createLandmarker(() => {});
   let lmReady = false;
   const camera = new CameraControl({

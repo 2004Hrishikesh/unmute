@@ -102,7 +102,32 @@ async function loadUsage() {
       <div class="stat"><div class="v">${u.n}</div><div class="k">Confirmed sentences</div></div></div>`;
   } catch {}
 }
-async function load() { loadUsage(); try { render((await api("/api/results")).results); } catch (e) { $("#content").textContent = e.message; } }
+async function loadModel() {
+  const el = $("#model");
+  try {
+    const { report: m } = await api("/api/model");
+    if (!m || !m.lopo || !m.lopo.overall) { el.innerHTML = "No trained model yet. Record volunteers (Calibrate → Volunteer), then run <code>.venv/bin/python scripts/train.py</code>."; return; }
+    const o = m.lopo.overall, best = o[m.best] || o.matcher, mt = o.matcher, nn = o.model;
+    const cal = m.lopo.calibrated || {};
+    let html = `<div class="stats">
+      <div class="stat"><div class="v">${pct(best.top1)}</div><div class="k">First card, brand-new patient (${esc(m.use ? m.best : "matcher")})</div></div>
+      <div class="stat"><div class="v">${pct(best.top3)}</div><div class="k">In the 3 cards, brand-new patient</div></div>
+      <div class="stat"><div class="v">${m.users.length}</div><div class="k">People in training</div></div>
+      <div class="stat"><div class="v">${m.samples}</div><div class="k">Recordings</div></div></div>`;
+    html += `<table><thead><tr><th>Brand-new patient</th><th>First card</th><th>In the 3 cards</th></tr></thead><tbody>
+      <tr><td>Matcher alone (before)</td><td>${pct(mt.top1)}</td><td>${pct(mt.top3)}</td></tr>
+      <tr><td>Trained model alone</td><td>${pct(nn.top1)}</td><td>${pct(nn.top3)}</td></tr>
+      ${m.use ? `<tr><td><b>Deployed: model + matcher</b> <span class="muted small">${esc(m.best)}</span></td><td><b>${pct(best.top1)}</b></td><td><b>${pct(best.top3)}</b></td></tr>` : ""}
+      </tbody></table>`;
+    if (m.use && cal.matcher && cal[m.best]) {
+      html += `<p class="muted" style="margin-top:12px">Patients who already have their own recordings: matcher ${pct(cal.matcher.top1)} / ${pct(cal.matcher.top3)},
+        model + matcher ${pct(cal[m.best].top1)} / ${pct(cal[m.best].top3)}, so ${m.use_for_calibrated ? "the model is used for them too" : "they get the matcher alone (their own samples win)"}.</p>`;
+    }
+    html += `<p class="muted small">${m.use ? "Deployed." : "Not deployed: the matcher alone measured as good or better."} ${esc(m.picked_note || "")} Trained ${esc(m.trained_at || "")} on ${m.samples} recordings, ${m.phrases} phrases, in ${m.train_s}s on this laptop's CPU.</p>`;
+    el.innerHTML = html;
+  } catch (e) { el.textContent = e.message; }
+}
+async function load() { loadUsage(); loadModel(); try { render((await api("/api/results")).results); } catch (e) { $("#content").textContent = e.message; } }
 $("#runBtn").addEventListener("click", async () => {
   $("#runBtn").disabled = true; $("#runBtn").textContent = "Running…";
   try { render((await api("/api/evaluate", { method: "POST" })).results); }

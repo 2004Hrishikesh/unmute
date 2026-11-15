@@ -175,7 +175,37 @@ The dip at 1 is kesh's 10 phrases nobody else recorded: their first match is aga
 phrase were recorded one after another, so this is a little optimistic. Urgent phrases as deployed (pooled,
 held out): 86.5% top-1, 97.3% top-3 over 37 recordings.
 
-**Tests.** `.venv/bin/python -m pytest -q` (56 tests). `tests/test_real_accuracy.py` runs on the real recordings in
+## Trained on many people (for patients who can't record anything)
+
+A patient may be too weak to calibrate, correct, or confirm many sentences. For them Unmute has a model trained on
+everyone's recordings (`server/neural.py`, pure numpy, no GPU, no new dependency): speaker normalisation (each
+recording trimmed, centred on its own resting shape, scaled by its own movement size), heavy augmentation (time warp,
+crop, x/y stretch, rotation, left-right mirror, noise: a new variant of every recording every epoch), and an ensemble
+of 5 small neural networks. It is fused with the matcher.
+
+**Collect data:** Calibrate page → Phrases → **Volunteer** (all 20 phrases × 3, mixed order, about 4 minutes per
+person, "Next volunteer" button). **Train:** `.venv/bin/python scripts/train.py` (about 1 minute). The running server
+picks the new model up by itself.
+
+**Deployed only if it measures better.** `train.py` runs leave-one-person-out: train on everyone except one person,
+test on that person, exactly a brand-new patient. Measured 14 November 2026 with only 2 people (each fold trains on
+ONE other person):
+
+| Brand-new patient | First card | In the 3 cards |
+| --- | --- | --- |
+| Matcher alone (before) | 58.2% | 83.5% |
+| Trained model alone | 50.5% | 80.2% |
+| **Model + matcher (deployed, weight 0.25)** | **65.9%** | **86.8%** |
+| Model alone without augmentation | 48.4% | 69.2% |
+
+The model trained on kesh's 102 recordings beat the matcher on rishi (52.5% vs 42.5% first card); trained on rishi's
+40 it lost. More people is what makes it better. For a patient who already has their own recordings the fusion
+measured worse (63.4% / 88.7% against 75.4% / 93.7%), so they get the matcher alone: the model carries day one, the
+patient's own samples take over after. The fusion weight was picked on the same results it is reported with; with 2
+people that is optimistic, and it gets fairer with every volunteer. The trained model is gitignored (`data/model/`):
+run `train.py` on a fresh checkout.
+
+**Tests.** `.venv/bin/python -m pytest -q` (64 tests). `tests/test_real_accuracy.py` runs on the real recordings in
 `data/enrollments` when present and fails if accuracy drops below floors set just under the measured numbers.
 
 ## API contract
@@ -193,15 +223,17 @@ All JSON. A frame is a flat list of floats: `[mouth blendshapes (dims.bs) | lip 
 | `POST /api/ack` | `{id}` (or `"all"`) | `{ok}` |
 | `POST /api/relabel` | `{user, id, phrase}` | `{ok, id, from, to}`; only samples learned from use |
 | `GET /api/usage?user=` | | `{n, top1, top3, touch_board, corrections}` from real use |
+| `GET /api/model` | | the trained model's leave-one-person-out report |
 | `GET /api/results` / `POST /api/evaluate` | | leave-one-out results |
 | `GET /api/status` | | Gemini availability, ntfy topic, bed |
 
 ## Layout
 
 ```
-server/  app.py (API + static), features.py, classifier.py (DTW k-NN), rerank.py (Gemini), alerts.py (ntfy), evaluation.py
+server/  app.py (API + static), features.py, classifier.py (DTW k-NN), neural.py (many-people model), model_eval.py
+         (leave-one-person-out), rerank.py (Gemini), alerts.py (ntfy), evaluation.py
 web/     index.html + app.js (patient), enroll.*, nurse.*, proof.*, common.js, style.css
-scripts/ evaluate.py, demo_check.py, fetch_vendor.sh
+scripts/ evaluate.py, train.py, demo_check.py, fetch_vendor.sh
 data/    phrases.json, enrollments/*.json, requests.jsonl, results.json
 ```
 

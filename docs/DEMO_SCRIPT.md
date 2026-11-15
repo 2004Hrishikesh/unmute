@@ -122,12 +122,15 @@ Tap **Thank you** on the board. It is spoken, and the line under it says *Learne
 Optional: confirm a wrong card on purpose with a nod, then tap the button. The board says "Said the wrong thing? Tap
 what you meant." Pick the right one: it is spoken, and the recording is moved to the right phrase, not learned wrong.
 
+**Before the demo:** have as many volunteers as you can record on Calibrate → Volunteer, then run
+`.venv/bin/python scripts/train.py` and check the Proof page's "Trained on many people" card.
+
 **3:00 — No calibration needed (the answer to "patients can't do this")**
 
 Open **Settings**, change the name to a new one, e.g. `judge`. Mouth **"I need water"**.
 
-> "This person has never calibrated. Unmute matches against everyone's recordings on this laptop: the shared
-> starter model. And every sentence they confirm is saved as their own sample, so it becomes personal just from
+> "This person has never calibrated. A model trained on our volunteers reads them from the first minute, tested the
+> fair way: train on everyone except one person, test on that person. And every sentence they confirm is saved as their own sample, so it becomes personal just from
 > use. Measured: a new person got the right sentence in the three cards 90.2% of the time on the demo phrases."
 
 Confirm it. Point at "Starter model (no calibration yet)" under the cards. Change the name back.

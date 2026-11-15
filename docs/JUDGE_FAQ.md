@@ -113,3 +113,15 @@ before it is learned: 0 own samples of a phrase 55% first card / 85% in the thre
 4 or more 91% / 100%. Urgent phrases do better: as deployed they are in the three cards 97.3% of the time (37
 recordings). More people recording more phrases makes the zero-sample start better; the matcher's memory now grows
 linearly, so thousands of recordings are fine.
+
+**19. What if the patient is too weak to calibrate, correct, or confirm much?**
+
+Then the first minute has to work with nothing from them. Unmute has a model trained on many healthy volunteers'
+recordings (4 minutes each on the Calibrate page), with augmentation standing in for thousands of videos. We test
+it the honest way, leave-one-person-out: train on everyone but one person, test on that person. With just 2 people
+the model plus matcher gets the right sentence on the first card 65.9% of the time (matcher alone 58.2%) and in the
+three cards 86.8% (83.5%). It is only switched on because that test says it is better, and only for patients without
+their own recordings; once they have some, their own samples win. Every volunteer makes day one better. Confirming
+can be hands-free (the first card speaks itself after a countdown) or a long blink, so a weak patient needs no hands.
+Honest limit: a patient with a tube in the mouth can't move their lips enough; Unmute is for tracheostomy and
+post-surgery patients whose lips are free.
