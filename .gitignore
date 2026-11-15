@@ -10,7 +10,6 @@ data/gemini_state.json
 data/model/
 third_party/
 data/crops/
-data/avsr_config.json
 
 # local only: the nurse log, and screen recordings (the demo video goes to YouTube)
 data/requests.jsonl
