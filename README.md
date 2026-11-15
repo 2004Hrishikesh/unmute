@@ -264,7 +264,7 @@ data/    phrases.json, enrollments/*.json, requests.jsonl, results.json
 
 See [docs/COMPETITION.md](docs/COMPETITION.md) for the researched landscape with sources (SRAVI, eye-gaze devices,
 AAC apps, open-source lip readers, other hackathon projects), [docs/PITCH.md](docs/PITCH.md) for the story,
-[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) for the 4-minute demo, and [docs/JUDGE_FAQ.md](docs/JUDGE_FAQ.md).
+[docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) for the 4-minute demo, and [docs/JUDGE_FAQ.md](docs/JUDGE_FAQ.md). **Start here: [docs/RUNBOOK.md](docs/RUNBOOK.md)** (the story, every command, tonight's plan, the demo, the pre-demo tests).
 
 SRAVI (Liopa) recognises a fixed list of about 40 phrases and needs Wi-Fi. Unmute learns each patient's own lips,
 uses bedside context, and runs offline. The next step is open sentences: a pretrained visual speech recognition

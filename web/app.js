@@ -64,6 +64,26 @@ confirmSel.addEventListener("change", () => { settings.set("confirmMode", confir
 recordSel.addEventListener("change", () => { settings.set("recordMode", recordSel.value); applyMode(); });
 const autoMode = () => recordSel.value === "auto";
 
+// One question for the nurse instead of eight settings: what can this patient still do?
+const ABILITY = {
+  touch: { confirm: "nod", record: "tap", touch: true, autoS: 0 },    // cards are tappable in every mode
+  nod: { confirm: "nod", record: "auto", touch: true, autoS: 4 },     // touch button stays for the nurse
+  switch: { confirm: "switch", record: "tap", touch: true, autoS: 0 },
+  blink: { confirm: "blink", record: "auto", touch: true, autoS: 0 },
+};
+const abilitySel = $("#ability");
+abilitySel.value = settings.get("ability", "");
+abilitySel.addEventListener("change", () => {
+  const a = ABILITY[abilitySel.value];
+  settings.set("ability", abilitySel.value);
+  if (!a) return;
+  confirmSel.value = a.confirm; settings.set("confirmMode", a.confirm);
+  recordSel.value = a.record; settings.set("recordMode", a.record);
+  const ac = $("#autoConfirmS"); ac.value = a.autoS; ac.dispatchEvent(new Event("input"));
+  const at = $("#atToggle"); at.checked = a.touch; at.dispatchEvent(new Event("change"));
+  applyMode();
+});
+
 // Hands-free: the lips starting to move begins the recording; stillness ends it. Then the first card can
 // speak by itself after a countdown unless the patient shakes, blinks long, presses anything, or nods sooner.
 let autoConfirmMs = 4000;

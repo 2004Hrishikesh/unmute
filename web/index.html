@@ -37,6 +37,15 @@
       <details class="settings card" id="settings">
         <summary>Settings</summary>
         <div class="form">
+          <label>What can this patient do? (sets everything below in one go)
+            <select id="ability">
+              <option value="">Choose…</option>
+              <option value="touch">Can see and touch a screen: tap the cards, or the touch button for any sentence</option>
+              <option value="nod">Can nod, but not use hands: hands-free recording, nod to confirm, first card speaks itself</option>
+              <option value="switch">Can press one big button / switch: cards light up one by one</option>
+              <option value="blink">Can only blink: hands-free recording, long blink picks the lit card</option>
+            </select>
+          </label>
           <label>Who is using Unmute (same name as on Calibrate)
             <input id="userInput" type="text" placeholder="e.g. alex" autocomplete="off" />
           </label>
