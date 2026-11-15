@@ -20,7 +20,7 @@ stroke and ALS patients. **Not** patients with a breathing tube *in the mouth* (
 
 **The honest part about a brand-new patient (measured 14 Nov 2026).** With none of his own recordings, the
 open-source lip reader plus other people's recordings puts the right sentence on the **first card about 7 times in
-10** and **among the 3 cards about 7 times in 8** (71.2% / 87.1%, 240 silent recordings by 2 people it never saw,
+10** and **among the 3 cards about 7 times in 8** (71.3% / 87.1%, 240 silent recordings by 2 people it never saw,
 20 phrases, chance 5%). Without the lip reader it was 37.9% / 65.0%. When it's wrong: the touch board (him if he can
 touch, the nurse or family if not). Every correction is learned; with 2-3 of his own samples of a phrase the
 matcher alone has it in the 3 cards ~85-90% of the time.

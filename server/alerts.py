@@ -1,9 +1,12 @@
 """Urgent-phrase check and ntfy.sh push to the nurse's phone."""
 from __future__ import annotations
 
+import os
+
 import httpx
 
-NTFY_URL = "https://ntfy.sh"
+# ntfy is open source: a hospital can run its own server on its own network and point Unmute at it.
+NTFY_URL = os.environ.get("NTFY_URL", "https://ntfy.sh").rstrip("/")
 
 
 def is_urgent(sentence: str, urgent: list[str]) -> bool:

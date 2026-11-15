@@ -75,9 +75,10 @@ else:
 mi = st.get("model") or {}
 if mi.get("active"):
     line("OK", f"Many-people model on: {mi['samples']} recordings from {mi['people']} people, trained {mi['trained_at']}")
+elif (Path(__file__).resolve().parent.parent / "data" / "model" / "lipnet.json").exists():
+    line("OK", "Many-people model off by design: measured, it did not beat the matcher (the lip reader covers new patients)")
 else:
-    line("WARN", "Many-people model off (not trained, or it did not beat the matcher)",
-         "record volunteers (Calibrate -> Volunteer), then: .venv/bin/python scripts/train.py")
+    line("WARN", "Many-people model not trained", "optional: .venv/bin/python scripts/train.py")
 phrases = get("/api/phrases")
 demo = phrases["demo_set"]
 if not enr:

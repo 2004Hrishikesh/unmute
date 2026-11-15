@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta charset="utf-8"><style>:root{--bg:#0b1220;--panel:#121b2e;--panel-2:#18233a;--line:#26334f;--text:#eef2f8;--muted:#9aa8c2;--accent:#5eead4;--accent-ink:#062a26;--danger:#ef4444;--warn:#fbbf24}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1500px;height:1000px;background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+
+body{display:grid;grid-template-columns:1.05fr 1fr;gap:70px;padding:90px 100px;align-items:center;
+ background:radial-gradient(1100px 700px at 85% 15%,#123a3a 0%,transparent 60%),var(--bg)}
+.brand{font-size:132px;font-weight:850;letter-spacing:-3px;line-height:1}
+.brand span{color:var(--accent)}
+.tag{font-size:34px;line-height:1.35;color:var(--text);margin-top:30px;max-width:640px}
+.sub{font-size:24px;color:var(--muted);margin-top:22px;line-height:1.45;max-width:640px}
+.chips{display:flex;flex-wrap:wrap;gap:14px;margin-top:40px}
+.chip{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:12px 22px;font-size:21px;color:var(--text)}
+.chip b{color:var(--accent)}
+.phone{background:var(--panel);border:1.5px solid var(--line);border-radius:34px;padding:34px;box-shadow:0 30px 80px rgba(0,0,0,.45)}
+.lips{height:190px;border-radius:22px;background:linear-gradient(180deg,#0f1a2c,#0c1424);border:1.5px solid var(--line);display:grid;place-items:center;margin-bottom:24px;position:relative}
+.lips svg{width:250px}
+.rec{position:absolute;top:16px;left:18px;font-size:17px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.rec i{width:11px;height:11px;border-radius:50%;background:var(--danger);display:inline-block}
+.card{border-radius:20px;padding:26px 28px;font-size:34px;font-weight:750;margin-top:14px;border:2px solid var(--line);background:var(--panel-2);display:flex;justify-content:space-between;align-items:center}
+.card small{font-size:18px;font-weight:600;color:var(--muted)}
+.card.top{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.card.top small{color:var(--accent-ink);opacity:.8}
+.foot{margin-top:22px;font-size:19px;color:var(--muted);text-align:center}
+</style></head><body>
+<div>
+  <div class="brand">Un<span>mute</span></div>
+  <div class="tag">A voice for ICU patients who can move their lips but can't make a sound.</div>
+  <div class="sub">Silent lip reading with a laptop camera. Pick a card with a touch, a nod, one switch or a blink, and it is spoken out loud. Urgent requests alert the nurse.</div>
+  <div class="chips">
+    <div class="chip"><b>87%</b> right sentence in 3 cards, brand-new patient</div>
+    <div class="chip"><b>Offline</b>: video never leaves the laptop</div>
+    <div class="chip"><b>No setup</b>: no calibration needed</div>
+  </div>
+</div>
+<div class="phone">
+  <div class="lips"><div class="rec"><i></i> reading lips</div>
+    <svg viewBox="0 0 200 90"><path d="M10 45 Q55 5 100 30 Q145 5 190 45 Q145 88 100 80 Q55 88 10 45Z" fill="none" stroke="#5eead4" stroke-width="5" stroke-linejoin="round"/><path d="M28 45 Q100 62 172 45" fill="none" stroke="#5eead4" stroke-width="3.5" opacity=".7"/></svg>
+  </div>
+  <div class="card top">I need water <small>nod to say it</small></div>
+  <div class="card">Call my family <small>2</small></div>
+  <div class="card">I am cold <small>3</small></div>
+  <div class="foot">touch · nod · switch · blink</div>
+</div>
+</body></html>

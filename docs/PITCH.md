@@ -26,7 +26,8 @@ they confirm teaches Unmute their own lips. It needs no training data and works 
 
 1. **Face tracking in the browser.** MediaPipe Face Landmarker runs on the laptop. Each frame becomes about 108
    numbers: 40 lip points (centred on the mouth, head tilt removed, scaled by eye distance) and 28 mouth
-   blendshapes. Only these numbers go to the server. No video ever leaves the camera.
+   blendshapes. These numbers, plus a small mouth picture per frame for the lip reader, go to a server on the
+   same laptop (127.0.0.1 only). Video never leaves the laptop; only short text may (Gemini, the nurse's phone).
 2. **Matching against recordings.** Every recording on the laptop, the patient's own and other people's (the shared
    starter), is a template. A new recording is compared with each template by dynamic time warping (DTW), so
    mouthing fast or slow doesn't matter. The phrase with the closest template wins; the patient's own templates win

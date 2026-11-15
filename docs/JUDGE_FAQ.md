@@ -118,7 +118,7 @@ linearly, so thousands of recordings are fine.
 
 Then the first minute has to work with nothing from them, and that is what the open-source lip reader is for. On
 240 silent recordings by 2 people it never saw, no calibration, 20 phrases (chance 5%), the lip reader blended with
-other people's recordings put the right sentence on the first card 71.2% of the time and among the 3 cards 87.1%
+other people's recordings put the right sentence on the first card 71.3% of the time and among the 3 cards 87.1%
 (other people's recordings alone: 37.9% / 65.0%). We also trained our own small model on volunteers' recordings, but
 tested the honest way (leave-one-person-out, 4 people) it did not beat the matcher, so it is switched off; we only
 switch on what measures better. Every confirmed or corrected sentence becomes the patient's own sample; with 2-3 of
@@ -134,7 +134,7 @@ error rate on the standard LRS3 benchmark. It runs on the laptop's GPU, offline,
 training from us. We ask it how likely each phrase on the list is (fast and much more reliable than free text), blend
 that with the patient's own recordings, and also show its free-text reading as an extra card when it is confident.
 Measured on our own silent mouthing (240 recordings, 2 people it never saw, 20 phrases): alone, zero-shot, 66.7%
-first card and 83.3% in the 3 cards; blended with other people's recordings 71.2% / 87.1%. It learned from people
+first card and 83.3% in the 3 cards; blended with other people's recordings 71.3% / 87.1%. It learned from people
 speaking aloud, and still reads silent mouthing. Its free text is exactly right only 56/240 times, so off-list
 sentences are a bonus: shown only when it is sure and the reading isn't just a list phrase, and never spoken without
 a confirm. Caveat: 2 people, and the blend weight was picked on the same recordings.

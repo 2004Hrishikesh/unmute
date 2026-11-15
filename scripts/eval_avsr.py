@@ -63,6 +63,12 @@ def _lip_outputs(have, phrases, use_cache=True):
     return cache
 
 
+def _pct(x):
+    """Rounded half up, like the Proof page (171/240 = 71.25% shows as 71.3% in both)."""
+    from decimal import ROUND_HALF_UP, Decimal
+    return f"{Decimal(str(round(x * 100, 6))).quantize(Decimal('0.1'), ROUND_HALF_UP)}%"
+
+
 def _score(tally, w, names, truth):
     v = tally.setdefault(w, [0, 0, 0])
     v[0] += 1; v[1] += names[0] == truth; v[2] += truth in names[:3]
@@ -74,7 +80,7 @@ def _table(title, tally, extra=None):
     for w in WEIGHTS:
         n, h1, h3 = tally[w]
         label = {0.0: " (matcher alone)", 1.0: " (lip reader alone, zero-shot)"}.get(w, "")
-        print(f"  {w:<5}{label:32s} {h1 / n:6.1%}      {h3 / n:6.1%}   (n={n})")
+        print(f"  {w:<5}{label:32s} {_pct(h1 / n):>6}      {_pct(h3 / n):>6}   (n={n})")
 
 
 def _best(tally):
@@ -136,7 +142,8 @@ def main():
     print("\n  Brand-new patient, per person (lip reader alone | best blend):")
     for u, t in sorted(per_user.items()):
         a, b = t[1.0], t[w_new]
-        print(f"    {u:8s} n={a[0]:3d}   {a[1] / a[0]:6.1%} / {a[2] / a[0]:6.1%}   |   {b[1] / b[0]:6.1%} / {b[2] / b[0]:6.1%}")
+        print(f"    {u:8s} n={a[0]:3d}   {_pct(a[1] / a[0]):>6} / {_pct(a[2] / a[0]):>6}   |   "
+              f"{_pct(b[1] / b[0]):>6} / {_pct(b[2] / b[0]):>6}")
 
     def med(x):
         return f"{np.median(x):.2f}" if x else "-"

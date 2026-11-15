@@ -36,8 +36,13 @@ Unmute is a communication aid. It is not a medical device and it does not diagno
 - **Calibration, when someone has a minute.** "Quick start" is the 5 urgent phrases plus Yes/No (about 20 recordings);
   the demo set is 10 phrases. There is no model training. Every recording becomes a template, and a new recording is
   matched against them with dynamic time warping, so the speed of mouthing doesn't matter.
-- **Nothing leaves the laptop.** Face tracking runs in the browser. The matcher gets about 108 numbers per frame; the
-  open-source lip reader also gets a small lower-face picture per frame, processed by the server on the same laptop.
+- **Video never leaves the laptop.** Face tracking runs in the browser. The local server (it listens on 127.0.0.1
+  only) gets about 108 numbers per frame, plus a small lower-face picture per frame while the lip reader is on. The
+  pictures are processed in memory and never saved for a patient (Calibrate recordings keep aligned mouth crops in
+  `data/crops/`, gitignored, to measure the lip reader). Only short text may go to the internet, and both are
+  optional: the candidate sentences and bedside context to Gemini, and the urgent sentence to the nurse's phone
+  (ntfy; `NTFY_URL` points it at a hospital's own ntfy server). `tests/test_privacy.py` captures both and checks
+  they hold no picture, no face numbers and no name.
 - **Bedside context.** Gemini sees the top 5 lip-reading candidates plus the time, the last 5 requests and an
   optional care note. It reorders them only to break near-ties, and it may only pick from the candidates.
   **Safety rule, enforced in code:** Gemini can never remove the lip-reading top match, or an urgent phrase in the
@@ -209,8 +214,8 @@ saw, no calibration; chance 5% / 15%). "Brand-new patient" = the matcher only ha
 | --- | --- | --- |
 | Matcher alone (other people's recordings) | 37.9% | 65.0% |
 | Lip reader alone, zero-shot | 66.7% | 83.3% |
-| **Lip reader + matcher (deployed, weight 0.25)** | **71.2%** | **87.1%** |
-| Calibrated patient: matcher alone / + lip reader | 56.2% / 78.3% | 81.2% / 93.8% |
+| **Lip reader + matcher (deployed, weight 0.25)** | **71.3%** | **87.1%** |
+| Calibrated patient: matcher alone / + lip reader | 56.3% / 78.3% | 81.3% / 93.8% |
 
 Per person (lip reader + matcher, new patient): mayank 78.3% / 92.5%, pankaj 64.2% / 81.7%. Silent mouthing works
 even though the model learned from people speaking aloud. Caveats: 2 people; the weight and the free-text thresholds
@@ -234,7 +239,7 @@ test on that person, exactly a brand-new patient. Re-measured 14 November 2026 w
 phrases): matcher alone 40.0% / 66.8%, trained model alone 33.5% / 51.4%, best fusion 35.1% / 55.1%. So it is
 **not deployed**: with 4 people it doesn't beat the matcher. (With 2 people and 10 phrases it had measured 65.9% /
 86.8% vs 58.2% / 83.5%, but that was a smaller, easier test.) For a brand-new patient the open-source lip reader
-above is what works: 71.2% / 87.1%. The trained model is gitignored (`data/model/`): run `train.py` on a fresh
+above is what works: 71.3% / 87.1%. The trained model is gitignored (`data/model/`): run `train.py` on a fresh
 checkout.
 
 **Tests.** `.venv/bin/python -m pytest -q` (74 tests). `tests/test_real_accuracy.py` runs on the real recordings in

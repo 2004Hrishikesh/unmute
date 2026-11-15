@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"><style>:root{--bg:#0b1220;--panel:#121b2e;--panel-2:#18233a;--line:#26334f;--text:#eef2f8;--muted:#9aa8c2;--accent:#5eead4;--accent-ink:#062a26;--danger:#ef4444;--warn:#fbbf24}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1500px;height:1000px;background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+
+body{padding:70px 70px;display:flex;flex-direction:column;justify-content:center;height:1000px}
+h1{font-size:58px;font-weight:800;letter-spacing:-.5px}
+h1 span{color:var(--accent)}
+.lead{font-size:25px;color:var(--muted);margin-top:10px}
+.wrap{position:relative;margin-top:50px;display:flex;align-items:center;gap:0}
+.laptop{border:2.5px dashed var(--accent);border-radius:30px;padding:44px 34px 36px;position:relative;flex:0 0 1010px}
+.laptop .lbl{position:absolute;top:-19px;left:30px;background:var(--bg);padding:0 12px;color:var(--accent);font-weight:750;font-size:24px}
+.row{display:flex;align-items:stretch;gap:0}
+.box{background:var(--panel);border:1.5px solid var(--line);border-radius:18px;padding:22px 22px;width:270px}
+.box h3{font-size:26px;margin-bottom:10px}
+.box p{font-size:19px;color:var(--muted);line-height:1.42}
+.box.k{border-color:var(--accent)}
+.arrow{flex:0 0 52px;display:grid;place-items:center;color:var(--accent);font-size:30px}
+.down{display:flex;justify-content:flex-end;padding:10px 125px 10px 0;color:var(--accent);font-size:32px}
+.row2{display:flex;gap:0;justify-content:flex-end}
+.links{flex:0 0 70px;display:flex;flex-direction:column;justify-content:space-around;align-self:stretch;color:var(--warn);font-size:15px;text-align:center;padding:60px 0}
+.links div{border-top:2px dashed var(--warn);padding-top:6px}
+.out{flex:1;display:flex;flex-direction:column;gap:26px}
+.ext{border:1.5px dashed var(--warn);border-radius:18px;padding:18px 20px;background:rgba(251,191,36,.06)}
+.ext h3{font-size:24px;color:var(--warn);margin-bottom:6px}
+.ext p{font-size:19px;color:var(--muted);line-height:1.4}
+.note{margin-top:40px;font-size:23px;color:var(--muted);line-height:1.5;max-width:1050px}
+.note b{color:var(--text)}
+</style></head><body>
+<h1>How <span>Unmute</span> works</h1>
+<div class="lead">Everything inside the dashed line runs on the laptop. Only short text may leave it, and both links are optional.</div>
+<div class="wrap">
+  <div class="laptop"><div class="lbl">The laptop (works with Wi-Fi off)</div>
+    <div class="row">
+      <div class="box"><h3>Camera</h3><p>The patient silently mouths a sentence. Hands-free: starts when the lips move.</p></div>
+      <div class="arrow">→</div>
+      <div class="box"><h3>Face tracking</h3><p>MediaPipe in the browser: 108 numbers per frame, plus a small mouth picture.</p></div>
+      <div class="arrow">→</div>
+      <div class="box k"><h3>Local server</h3><p>127.0.0.1 only. DTW matcher + Auto-AVSR lip reader (250M params) on the laptop GPU.</p></div>
+    </div>
+    <div class="down">↓</div>
+    <div class="row" style="justify-content:flex-end">
+      <div class="box"><h3>Speak + alert</h3><p>Spoken out loud. Urgent: red screen, alarm, Nurse page.</p></div>
+      <div class="arrow">←</div>
+      <div class="box"><h3>Pick one</h3><p>Touch, nod, one switch, or a long blink. Or the touch board.</p></div>
+      <div class="arrow">←</div>
+      <div class="box k"><h3>3 big cards</h3><p>The 3 most likely of 20 bedside sentences, plus free text when it's sure.</p></div>
+    </div>
+  </div>
+  <div class="links"><div>text only</div><div>text only</div></div>
+  <div class="out">
+    <div class="ext"><h3>Gemini (optional)</h3><p>Text only: the 5 candidate sentences, the time and recent requests. It may reorder; safety rules are in code.</p></div>
+    <div class="ext"><h3>Nurse's phone (ntfy)</h3><p>Text only: "Bed 7: I am in pain". It can be self-hosted.</p></div>
+  </div>
+</div>
+<div class="note"><b>Measured on people it never saw, no calibration (20 phrases):</b> right sentence in the 3 cards 87.1%, on the first card 71.3% (chance 15% / 5%). Every correction becomes the patient's own sample, so it learns their lips.</div>
+</body></html>
