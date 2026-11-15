@@ -79,7 +79,7 @@ phrases, plus a bonus free-text card when it's sure".
 | --- | --- | --- |
 | 0:00 | Nothing on screen yet | Mr. Sharma's story, two sentences: tube in the neck, lips move, no voice; nurses guess. |
 | 0:30 | Patient page. Settings → "Can nod, not use hands". Mouth **"I need water"** | "No button. It starts when my lips move. No calibration for a new patient." Nod. It speaks. |
-| 1:15 | Mouth **"I cannot breathe"**, nod | Red screen, alarm, teammate holds up the phone (ntfy). "The nurse knew before he even confirmed." |
+| 1:15 | Mouth **"I cannot breathe"** and don't confirm | After a 2-second red bar the alarm goes off by itself (if no bar, nod). Teammate holds up the phone (ntfy). "Urgent sentences don't wait for a nod; a misread is cancelled with one tap and the nurse is told." |
 | 1:45 | Mouth **"Thank you"** (weak phrase); if wrong, drag the round button, tap it, tap Thank you | "When it's wrong there's always a way out, and the mistake teaches it his lips." |
 | 2:30 | Settings → "Can only blink". Mouth **"No"**, close eyes on the lit card | "Whatever he can still move: head, finger, eyelid." |
 | 3:00 | Optional: mouth something not on the list, e.g. **"Where is my phone"**, big and slow | Free text is card 1 (dashed, "lip reader heard") only if the lip reader is very sure and no phrase fits; else an extra card or hidden. Free text was exactly right only 56/240 times, so **try it before the demo; if it doesn't show, skip this beat**. Either way say: "An open-source lip reader trained on 3,000 hours of video, offline on this laptop, reads a new patient with no calibration: right sentence in the 3 cards 87% of the time." |

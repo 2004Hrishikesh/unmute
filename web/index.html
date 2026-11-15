@@ -56,6 +56,7 @@
           <label class="row"><input id="lipToggle" type="checkbox" checked /> Use the open-source lip reader (Auto-AVSR, runs on this laptop; reads any sentence, no calibration)</label>
           <label class="row"><input id="learnToggle" type="checkbox" checked /> Learn from every confirmed sentence (no calibration needed)</label>
           <label class="row"><input id="preAlertToggle" type="checkbox" checked /> Pre-alert the nurse the moment the best guess is urgent, before confirmation</label>
+          <label class="row"><input id="autoUrgentToggle" type="checkbox" checked /> Urgent sentences raise the alarm by themselves when the lip reader is sure (no nod needed; 2-second cancel)</label>
           <label>How does the patient confirm a choice?
             <select id="confirmMode">
               <option value="nod">Nod (shake = next)</option>
@@ -129,6 +130,7 @@
     <h1 id="urgentText"></h1>
     <p id="urgentPush">Alerting the nurse…</p>
     <button id="urgentAck" class="btn">Nurse is here: clear alarm</button>
+    <button id="urgentCancel" class="btn hidden">Not what I said: cancel</button>
   </div>
 
   <script type="module" src="/app.js"></script>

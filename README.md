@@ -73,6 +73,14 @@ Unmute is a communication aid. It is not a medical device and it does not diagno
 - **Pre-alert before confirmation.** The moment the best guess is an urgent phrase, the nurse page and phone get a
   "Possible (not yet confirmed)" alert (Settings toggle, on by default). The sentence the patient then confirms
   supersedes it; a false alarm costs the nurse a glance, a missed "I cannot breathe" costs more.
+- **Urgent sentences raise the alarm by themselves.** When the lip reader is at least 40% sure the top card is an
+  urgent sentence ("I am in pain", "Help me", "I cannot breathe", "Call the nurse", "I feel sick"), no nod is
+  needed: after a 2-second countdown on that card it is spoken, the screen turns red, the alarm sounds and the
+  nurse's phone is told it was raised automatically. Shaking the head, Esc or another card stops the countdown; a
+  "Not what I said" button cancels a raised alarm and tells the nurse it was a misread. Measured on 240 silent
+  recordings (lip reader + matcher, before Gemini): it fires on 58-65% of urgent sentences and wrongly on 1 of 180
+  others (0.6%). Below 40% the patient confirms as usual and the nurse still gets the "possible" heads-up.
+  Automatic alarms are never learned from. Settings toggle, on by default.
 - **Touch board (assistive touch).** A floating button the patient can drag anywhere on the screen. Tap it (or press
   `T`) for every sentence as a big button, urgent ones first. It is the way out when lip reading is wrong, the room is
   dark, or the camera can't see the face. When it corrects a lip reading, the recording is learned under the sentence

@@ -14,20 +14,17 @@ def is_urgent(sentence: str, urgent: list[str]) -> bool:
     return any(s == u.lower() for u in urgent)
 
 
-async def push_ntfy(topic: str, sentence: str, bed: str) -> tuple[bool, str]:
-    """Send an urgent push. Returns (ok, detail). Never raises."""
+async def push_ntfy(topic: str, sentence: str, bed: str, note: str = "", title: str = "Unmute: urgent request",
+                    priority: str = "urgent", tags: str = "rotating_light") -> tuple[bool, str]:
+    """Send a push to the nurse's phone. Returns (ok, detail). Never raises."""
     if not topic:
         return False, "no topic configured"
     try:
         async with httpx.AsyncClient(timeout=4.0) as client:
             r = await client.post(
                 f"{NTFY_URL}/{topic}",
-                content=f"{bed}: \"{sentence}\"".encode("utf-8"),
-                headers={
-                    "Title": "Unmute: urgent request",
-                    "Priority": "urgent",
-                    "Tags": "rotating_light",
-                },
+                content=(f"{bed}: \"{sentence}\"" + (f" {note}" if note else "")).encode("utf-8"),
+                headers={"Title": title, "Priority": priority, "Tags": tags},
             )
         return r.status_code < 300, f"ntfy HTTP {r.status_code}"
     except Exception as e:  # offline, DNS, timeout...

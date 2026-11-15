@@ -28,12 +28,12 @@ async function refresh() {
     const t = new Date(r.ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     const possible = r.confirmed === false;
     tr.append(cell(`${t} (${r.ago})`), cell(`${r.bed} · ${r.user}`), cell((possible ? "Possible: " : "") + r.sentence, "sentence"),
-      cell(possible ? "best guess, not confirmed yet" : `${r.method}${r.mode ? ", " + r.mode : ""}`));
+      cell(possible ? "best guess, not confirmed yet" : `${r.method === "auto-urgent" ? "raised automatically" : r.method}${r.mode ? ", " + r.mode : ""}`));
     const st = document.createElement("td");
     if (r.urgent && !r.acknowledged) {
       const b = document.createElement("button"); b.className = "btn danger"; b.textContent = "Acknowledge";
       b.onclick = () => ack(r.id); st.appendChild(b);
-    } else st.textContent = r.urgent ? (r.superseded_by ? "possible · patient then confirmed below" : "urgent · acknowledged") : "logged";
+    } else st.textContent = r.urgent ? (r.cancelled ? "cancelled by the patient: misread" : r.superseded_by ? "possible · patient then confirmed below" : "urgent · acknowledged") : "logged";
     tr.appendChild(st);
     tbody.appendChild(tr);
   }

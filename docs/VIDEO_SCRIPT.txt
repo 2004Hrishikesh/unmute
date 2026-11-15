@@ -11,6 +11,7 @@ PHRASES (measured on your own recordings, right on the first card)
          planned error: Thank you (25%)
 
 BEFORE YOU PRESS RECORD
+  - Reload the Unmute page once (Cmd+R). In Settings, "Urgent sentences raise the alarm by themselves" is ticked.
   - Do Not Disturb on. Zoom and FaceTime closed. Volume about 70%.
   - Light in front of your face. Click the page once so it can play sound.
   - Nurse page: Acknowledge all. Don't show the Nurse page on video (its header shows the alert topic).
@@ -36,10 +37,17 @@ SAY: Three big cards, best guess first.
 DO:  Press 1. Wait for the laptop to speak.
 SAY: One tap, and it's spoken out loud.
 
-1:05  DEMO 2: AN EMERGENCY
-SAY: Now an emergency.
-DO:  Hold Space, mouth "I am in pain" (Rishi: "I cannot breathe"), let go, press 1. Hold your phone up to the camera.
-SAY: Urgent requests turn the screen red, sound an alarm, and buzz the nurse's phone. The nurse knows the moment the cards appear.
+1:05  DEMO 2: AN EMERGENCY, NO NOD NEEDED
+SAY: Now an emergency. Watch: after I mouth it, I won't confirm anything.
+DO:  Hold Space, mouth "I am in pain" (Rishi: "I cannot breathe"), let go, hands off.
+     A red bar fills on the card for 2 seconds.
+  IF THE ALARM GOES OFF BY ITSELF:   it speaks, the screen turns red, the phone buzzes. Hold the phone up.
+     SAY: For urgent sentences, Unmute doesn't wait for a nod. When the lip reader is sure, it raises the alarm by itself, and the nurse's phone buzzes.
+     SAY: If it ever misreads, one tap on "Not what I said" cancels it, and the nurse is told.
+     DO:  Tap "Nurse is here: clear alarm".
+  IF THERE'S NO RED BAR (not sure enough):   press 1. The alarm goes off. Hold the phone up.
+     SAY: When it's less sure, it asks the patient first. The nurse already got a heads-up, and now the alarm is on.
+     DO:  Tap "Nurse is here: clear alarm".
 
 1:25  DEMO 3: WHEN IT GETS IT WRONG
 SAY: Lip reading isn't perfect. So here's a hard one.

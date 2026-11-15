@@ -378,6 +378,8 @@ class RelabelIn(BaseModel):
 
 class AckIn(BaseModel):
     id: str
+    # True when the patient cancels an alarm that was raised automatically from a misread ("Not what I said").
+    cancelled: bool = False
 
 
 # ---------------------------------------------------------------- routes
@@ -598,7 +600,9 @@ async def log(body: LogIn):
     }
     if urgent:
         text = body.sentence if body.confirmed else f"Possible (not yet confirmed): {body.sentence}"
-        ok, detail = await alerts.push_ntfy(NTFY_TOPIC, text, BED)
+        # Raised by itself (the lip reader was sure of an urgent sentence): say so, so the nurse knows it's unconfirmed.
+        note = "(raised automatically; the patient can cancel it)" if body.method == "auto-urgent" else ""
+        ok, detail = await alerts.push_ntfy(NTFY_TOPIC, text, BED, note=note)
         row["push"] = detail
     learned_id = _learn_from_use(user, body) if body.confirmed and body.learn and body.frames else None
     row["learned"] = bool(learned_id)
@@ -718,7 +722,8 @@ def request_one(rid: str):
 
 
 @app.post("/api/ack")
-def ack(body: AckIn):
+async def ack(body: AckIn):
+    cancelled = None
     with _lock:
         rows = read_requests()
         hit = False
@@ -726,10 +731,19 @@ def ack(body: AckIn):
             if body.id in (r["id"], "all") and r["urgent"] and not r["acknowledged"]:
                 r["acknowledged"] = True
                 r["ack_ts"] = time.time()
+                if body.cancelled and r["id"] == body.id:
+                    r["cancelled"] = True
+                    cancelled = r
                 hit = True
         if hit:
             write_requests(rows)
-    return {"ok": True}
+    out = {"ok": True}
+    if cancelled:  # the nurse's phone already buzzed for it: tell them it was a misread
+        ok, detail = await alerts.push_ntfy(NTFY_TOPIC, cancelled["sentence"], BED,
+                                            note="was a misread: the patient cancelled the alarm",
+                                            title="Unmute: alarm cancelled", priority="default", tags="white_check_mark")
+        out["push"] = detail
+    return out
 
 
 @app.get("/api/results")

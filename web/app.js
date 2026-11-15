@@ -29,6 +29,11 @@ lipToggle.checked = settings.get("lipReader", true);
 lipToggle.addEventListener("change", () => { settings.set("lipReader", lipToggle.checked); applyLipReader(); });
 function applyLipReader() { if (tracker) tracker.captureMouth = lipReader.installed && lipToggle.checked; }
 const FIX_WINDOW_MS = 60000;
+// Urgent sentences raise the alarm by themselves when the lip reader is sure. Measured on 240 silent recordings
+// (docs: README): at 0.4 it fires on about 6 in 10 urgent sentences and wrongly on 1 in 180 others. Below it,
+// the patient confirms as usual and the nurse still gets the "possible" heads-up.
+const AUTO_URGENT_MIN_CONF = 0.4, AUTO_URGENT_MS = 2000;
+let urgentArmed = null, urgentArmedAt = 0, urgentArmTimer = null;
 
 // ---------------------------------------------------------------- settings UI
 
@@ -139,6 +144,28 @@ learnToggle.addEventListener("change", () => settings.set("learn", learnToggle.c
 const preAlertToggle = $("#preAlertToggle");
 preAlertToggle.checked = settings.get("preAlert", true);
 preAlertToggle.addEventListener("change", () => settings.set("preAlert", preAlertToggle.checked));
+const autoUrgentToggle = $("#autoUrgentToggle");
+autoUrgentToggle.checked = settings.get("autoUrgent", true);
+autoUrgentToggle.addEventListener("change", () => settings.set("autoUrgent", autoUrgentToggle.checked));
+
+// An urgent sentence the lip reader is sure of: no nod needed. A short countdown on its card, then it is spoken,
+// the alarm sounds and the nurse is alerted. Shaking the head, Esc, or picking another card stops it.
+function armUrgent(sentence) {
+  disarmUrgent();
+  urgentArmed = sentence; urgentArmedAt = performance.now();
+  stopAutoConfirm();
+  const i = options().indexOf(sentence);
+  if (i >= 0) selected = i;
+  renderChoices();
+  urgentArmTimer = setTimeout(() => {
+    const s = urgentArmed; urgentArmed = null;
+    if (state === "choosing" && s) sayAndLog(s, "auto-urgent", null, { learn: false });
+  }, AUTO_URGENT_MS);
+}
+function disarmUrgent() {
+  clearTimeout(urgentArmTimer); urgentArmTimer = null;
+  if (urgentArmed) { urgentArmed = null; if (state === "choosing") renderChoices(); }
+}
 
 // Before the patient confirms: if the best guess is urgent, the nurse is told now, marked "possible".
 // The confirmed sentence that follows supersedes it on the nurse page. A false alarm costs a glance;
@@ -198,7 +225,7 @@ async function refreshStatus() {
 
 function setState(s, extra = {}) {
   state = s;
-  if (s !== "choosing") { stopScan(); stopAutoConfirm(); }
+  if (s !== "choosing") { stopScan(); stopAutoConfirm(); disarmUrgent(); }
   cam.classList.toggle("recording", s === "recording");
   $("#recDot").classList.toggle("hidden", s !== "recording");
   recordBtn.classList.toggle("on", s === "recording");
@@ -235,12 +262,13 @@ function setState(s, extra = {}) {
 }
 
 function renderChoices() {
-  statusEl.textContent = "Did you say…";
+  statusEl.textContent = urgentArmed ? "Urgent: alerting the nurse…" : "Did you say…";
   subEl.textContent = {
     nod: autoMode() && autoConfirmMs > 0 ? "Nod to confirm now · shake for the next one · or wait and the first card speaks by itself" : "Nod to confirm · shake your head for the next one",
     switch: "Press the button when the right one lights up",
     blink: "Close your eyes for a moment when the right one lights up",
   }[mode()];
+  if (urgentArmed) subEl.textContent = "The alarm goes off by itself in a moment. To stop it: shake your head, press Esc, or pick another card.";
   const opts = options();
   choicesEl.innerHTML = "";
   opts.forEach((c, i) => {
@@ -254,10 +282,11 @@ function renderChoices() {
     }
     const countdown = mode() !== "nod" ? scanMs * (performance.now() - choiceShownAt < 300 ? 1.4 : 1)
       : (autoMode() && autoConfirmMs > 0 ? autoConfirmMs : 0);
-    if (i === selected && countdown > 0) {
+    const armedLeft = urgentArmed === c ? Math.max(0, AUTO_URGENT_MS - (performance.now() - urgentArmedAt)) : 0;
+    if (armedLeft > 0 || (!urgentArmed && i === selected && countdown > 0)) {
       const bar = document.createElement("span");
-      bar.className = "scanbar";
-      bar.style.animationDuration = `${countdown}ms`;
+      bar.className = "scanbar" + (armedLeft > 0 ? " urgentbar" : "");
+      bar.style.animationDuration = `${armedLeft > 0 ? armedLeft : countdown}ms`;
       b.appendChild(bar);
     }
     b.addEventListener("click", () => confirm(i, "click"));
@@ -276,6 +305,7 @@ function options() {
 }
 
 function moveSelection(delta, auto = false) {
+  if (!auto) disarmUrgent();
   const n = options().length;
   selected = (selected + delta + n) % n;
   beep(auto ? 520 : 660, 60, auto ? 0.06 : 0.12);
@@ -326,7 +356,10 @@ async function onRecorded(rec) {
     if (r.mode === "offline" && r.reason) reasonEl.textContent = "Offline mode: " + r.reason;
     if (r.source === "starter") reasonEl.textContent = (r.recogniser === "model+matcher"
       ? "Model trained on many people (no calibration yet). " : "Starter model (no calibration yet). ") + reasonEl.textContent;
-    preAlert(choices[0]);
+    const top = r.candidates && r.candidates[0];
+    const sureUrgent = autoUrgentToggle.checked && top && URGENT.includes(top.phrase)
+      && top.confidence >= AUTO_URGENT_MIN_CONF && String(r.recogniser || "").startsWith("lip reader");
+    if (sureUrgent) armUrgent(top.phrase); else preAlert(choices[0]);
     if (heardFirst) reasonEl.textContent = "Not on the list? The lip reader read this as free text. " + reasonEl.textContent;
     renderDebug(r);
   } catch (e) {
@@ -336,6 +369,7 @@ async function onRecorded(rec) {
 
 async function confirm(i, method) {
   if (state !== "choosing") return;
+  disarmUrgent();
   const opts = options();
   const sentence = opts[i];
   if (sentence === undefined) return;
@@ -501,6 +535,7 @@ function showUrgent(row) {
   $("#urgentText").textContent = row.sentence;
   $("#urgentPush").textContent = row.push && row.push.startsWith("ntfy HTTP 2")
     ? "Nurse's phone alerted." : `Nurse station alerted. (Phone push: ${row.push || "not sent"})`;
+  $("#urgentCancel").classList.toggle("hidden", row.method !== "auto-urgent");
   $("#urgent").classList.remove("hidden");
   alarm(true);
   clearInterval(urgentPoll);
@@ -516,6 +551,18 @@ async function clearUrgent(sendAck = true) {
   urgentId = null;
 }
 $("#urgentAck").addEventListener("click", () => clearUrgent(true));
+// The alarm was raised automatically from a misread: the patient (or anyone) cancels it, and the nurse is told.
+$("#urgentCancel").addEventListener("click", async () => {
+  const id = urgentId;
+  alarm(false);
+  clearInterval(urgentPoll);
+  $("#urgent").classList.add("hidden");
+  urgentId = null;
+  speechSynthesis.cancel();
+  try { await api("/api/ack", { body: { id, cancelled: true } }); } catch {}
+  setState("idle", { msg: "Alarm cancelled. The nurse was told it was a misread. Try again, or use the touch board." });
+  nudgeTouch();
+});
 
 // ---------------------------------------------------------------- keyboard fallback
 

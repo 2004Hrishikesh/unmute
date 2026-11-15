@@ -51,7 +51,7 @@ I am in pain, Call my family, No (rishi: also I cannot breathe; kesh: also Help 
 | --- | --- | --- |
 | 0:00 | Patient page, your face on camera | "After a tracheostomy, ICU patients can move their lips but can't make a sound, so nurses guess. This is Unmute: it reads silent lips, offline, on this laptop." |
 | 0:15 | "Watch." Hold Space, silently mouth **I need water**, let go, press 1 | "Three cards. I pick one, and it's spoken out loud." |
-| 0:35 | "Now an emergency." Hold Space, mouth **I am in pain**, let go, press 1. Hold the phone up to the camera | "Urgent requests turn the screen red, sound an alarm and buzz the nurse's phone." |
+| 0:35 | "Now an emergency." Hold Space, mouth **I am in pain**, let go, hands off: after a 2-second red bar the alarm goes off by itself (if no bar, press 1). Hold the phone up | "For urgent sentences, Unmute doesn't wait for a nod. When the lip reader is sure, it raises the alarm by itself. If it misreads, one tap cancels it and the nurse is told." |
 | 0:55 | Tap the round touch button, tap **Call my family** | "If it's ever wrong, there's always a way out, and every correction teaches it this patient's lips." |
 | 1:10 | Say "For a patient who can only blink:", then Settings → **Can only blink**. **Silent from here:** mouth **No**, close your eyes about 1 s on the lit card. Switch back to touch mode before speaking | (silent) |
 | 1:30 | Wi-Fi off from the menu bar. Hold Space, mouth **Call my family**, let go, press 1 | "No internet: it still works, and the video never leaves this laptop." |

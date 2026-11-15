@@ -41,7 +41,7 @@ def isolated_data(tmp_path, monkeypatch):
     monkeypatch.setattr(rerank, "_failed_at", 0.0)
     monkeypatch.setenv("GEMINI_API_KEY", "")
 
-    async def fake_push(topic, sentence, bed):
+    async def fake_push(topic, sentence, bed, **kw):
         return False, "test"
 
     monkeypatch.setattr(alerts, "push_ntfy", fake_push)

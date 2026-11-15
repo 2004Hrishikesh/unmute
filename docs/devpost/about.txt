@@ -10,7 +10,7 @@ We wanted the simplest possible thing: an ordinary laptop on the bed table that 
 2. **Three big cards** show the most likely of 20 bedside sentences: "I need water", "I am in pain", "Call my family", "I cannot breathe" and so on.
 3. The patient picks one with **whatever they can still move: a touch, a nod, one switch, or a long blink.** The nurse sets this up with one question: "What can this patient do?"
 4. The laptop **says the sentence out loud.**
-5. **Urgent sentences escalate:** a red screen, an alarm, the Nurse page, and a push to the nurse's phone. The nurse is told "possible, not yet confirmed" the moment the cards appear.
+5. **Urgent sentences don't wait for a nod.** When the lip reader is sure the patient said "I am in pain", "Help me" or another urgent sentence, Unmute says it out loud, turns the screen red, sounds an alarm and buzzes the nurse's phone by itself, after a 2-second countdown the patient can stop. On 240 silent recordings it fired on about 6 in 10 urgent sentences and wrongly on 1 in 180 others. A misread alarm is cancelled with one tap, and the nurse is told.
 6. **When it's wrong, there's always a way out.** A movable touch button opens every sentence, for the patient or the nurse. Every correction teaches Unmute this patient's lips.
 7. **Something not on the list?** The lip reader's own reading appears as an extra card, only when it is sure. It is never spoken without a confirm.
 8. **Dark room at 3 a.m.?** The screen becomes a soft light on the face, so the camera can still see the lips.
