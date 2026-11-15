@@ -168,13 +168,16 @@ confirming or correcting on the touch board does). By how many own samples of th
 
 | Own samples of the phrase | 0 | 1 | 2 | 3 | 4+ |
 | --- | --- | --- | --- | --- | --- |
-| Top-1 | 55.0% | 46.7% | 80.0% | 70.0% | 90.9% |
-| Top-3 | 85.0% | 73.3% | 93.3% | 93.3% | 100.0% |
-| Recordings | 20 | 30 | 30 | 30 | 22 |
+| Top-1 | 25.7% | 32.9% | 67.1% | 70.0% | 66.7% |
+| Top-3 | 54.3% | 68.6% | 84.3% | 91.4% | 91.4% |
+| Recordings | 70 | 70 | 70 | 70 | 105 |
 
-The dip at 1 is kesh's 10 phrases nobody else recorded: their first match is against a single template. Samples of one
-phrase were recorded one after another, so this is a little optimistic. Urgent phrases as deployed (pooled,
-held out): 86.5% top-1, 97.3% top-3 over 37 recordings.
+Matcher only (no lip reader), 4 people, 20 phrases, 14 Nov 2026. With 2 people and 10 phrases it had measured 55% /
+85% at 0 and 91% / 100% at 4+: 20 phrases are harder, and one volunteer is a much harder case (43.8% / 68.6% even
+on his own recordings). Two own samples is where it turns: from about 1 in 2 to about 6 in 7 in the 3 cards. The
+lip reader covers the start (below). Samples of one phrase were recorded close together, so this is a little
+optimistic. Urgent phrases as deployed (pooled, held out), in the 3 cards: 83.8% over 99 recordings (92.8%
+without that volunteer).
 
 ## Open-source lip reader (Auto-AVSR): no calibration, any sentence
 
@@ -187,16 +190,32 @@ line so the authors' CTC scorer runs on Apple GPUs).
 - **Phrase scoring.** For every phrase on the list, the model's probability that these lips said exactly that
   sentence (decoder + CTC, the authors' 0.9 / 0.1 mix). Blended with the matcher; phrases nobody has recorded can
   still be read. Measured on this M5 Pro: 0.05-0.3 s.
-- **Free text.** Beam search for anything not on the list, shown as an extra "lip reader heard" card, never spoken
-  by itself. Only shown when the model is confident: on garbage input it still writes TED-talk filler at -1.6 to
-  -1.9 log-probability per word piece, so the cutoff is -0.8. About 1.1-1.3 s.
+- **Free text.** Beam search for anything not on the list, about 0.5-1 s. Never spoken by itself. Measured on real
+  mouthing, its reading of a list phrase is usually a near miss ("called my family", "i'm in bed"), so a reading that
+  looks like a list phrase is hidden (that card is already there). It is an extra card when confident (> -0.8 per
+  word piece; garbage input scores -1.6 to -1.9), and card 1 only when very confident (> -0.4) and no list phrase
+  fits the lips. The first rule ("more likely than any list phrase") put free text on card 1 wrongly 124/240 times;
+  this one 4/240.
 - **What the browser sends.** For this model the browser sends a 192 x 192 JPEG of the lower face per frame plus 4
   key points to the local server (same laptop), which aligns it the way the model was trained (mean-face
   similarity transform, 96 x 96 mouth crop, 25 fps). Nothing goes to the internet. Calibration recordings keep their
   aligned mouth crops in `data/crops/` (gitignored: face images) so `scripts/eval_avsr.py` can measure the reader on
-  our own mouths and save the blend weight to `data/avsr_config.json`.
-- **Not measured yet on our mouths.** Until `eval_avsr.py` has 20+ recordings with crops, the blend weight is 0.5.
-  Silent mouthing differs from speech, which the model was trained on; measure before you quote a number.
+  our own mouths and save the blend weights to `data/avsr_config.json`.
+
+**Measured on our silent mouthing** (14 Nov 2026, 240 recordings of the 20 phrases by 2 volunteers the model never
+saw, no calibration; chance 5% / 15%). "Brand-new patient" = the matcher only has other people's recordings:
+
+| Brand-new patient | First card | In the 3 cards |
+| --- | --- | --- |
+| Matcher alone (other people's recordings) | 37.9% | 65.0% |
+| Lip reader alone, zero-shot | 66.7% | 83.3% |
+| **Lip reader + matcher (deployed, weight 0.25)** | **71.2%** | **87.1%** |
+| Calibrated patient: matcher alone / + lip reader | 56.2% / 78.3% | 81.2% / 93.8% |
+
+Per person (lip reader + matcher, new patient): mayank 78.3% / 92.5%, pankaj 64.2% / 81.7%. Silent mouthing works
+even though the model learned from people speaking aloud. Caveats: 2 people; the weight and the free-text thresholds
+were picked on these same recordings (optimistic); free text is exactly right 56/240 times, so off-list sentences
+are a bonus, not the core. Re-measure with `.venv/bin/python scripts/eval_avsr.py` (cached: seconds).
 
 ## Trained on many people (for patients who can't record anything)
 
@@ -211,25 +230,16 @@ person, "Next volunteer" button). **Train:** `.venv/bin/python scripts/train.py`
 picks the new model up by itself.
 
 **Deployed only if it measures better.** `train.py` runs leave-one-person-out: train on everyone except one person,
-test on that person, exactly a brand-new patient. Measured 14 November 2026 with only 2 people (each fold trains on
-ONE other person):
+test on that person, exactly a brand-new patient. Re-measured 14 November 2026 with 4 people (385 recordings, 20
+phrases): matcher alone 40.0% / 66.8%, trained model alone 33.5% / 51.4%, best fusion 35.1% / 55.1%. So it is
+**not deployed**: with 4 people it doesn't beat the matcher. (With 2 people and 10 phrases it had measured 65.9% /
+86.8% vs 58.2% / 83.5%, but that was a smaller, easier test.) For a brand-new patient the open-source lip reader
+above is what works: 71.2% / 87.1%. The trained model is gitignored (`data/model/`): run `train.py` on a fresh
+checkout.
 
-| Brand-new patient | First card | In the 3 cards |
-| --- | --- | --- |
-| Matcher alone (before) | 58.2% | 83.5% |
-| Trained model alone | 50.5% | 80.2% |
-| **Model + matcher (deployed, weight 0.25)** | **65.9%** | **86.8%** |
-| Model alone without augmentation | 48.4% | 69.2% |
-
-The model trained on kesh's 102 recordings beat the matcher on rishi (52.5% vs 42.5% first card); trained on rishi's
-40 it lost. More people is what makes it better. For a patient who already has their own recordings the fusion
-measured worse (63.4% / 88.7% against 75.4% / 93.7%), so they get the matcher alone: the model carries day one, the
-patient's own samples take over after. The fusion weight was picked on the same results it is reported with; with 2
-people that is optimistic, and it gets fairer with every volunteer. The trained model is gitignored (`data/model/`):
-run `train.py` on a fresh checkout.
-
-**Tests.** `.venv/bin/python -m pytest -q` (69 tests). `tests/test_real_accuracy.py` runs on the real recordings in
-`data/enrollments` when present and fails if accuracy drops below floors set just under the measured numbers.
+**Tests.** `.venv/bin/python -m pytest -q` (74 tests). `tests/test_real_accuracy.py` runs on the real recordings in
+`data/enrollments` when present and fails if accuracy drops below floors set just under the measured numbers (strict floors on the original
+team, looser ones on all 4 people: one volunteer is a much harder lip-reading case).
 
 ## API contract
 

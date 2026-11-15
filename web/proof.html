@@ -20,6 +20,13 @@
 
   <main class="page">
     <div class="card">
+      <h2>Open-source lip reader on our silent mouthing: a brand-new patient</h2>
+      <p class="muted">Auto-AVSR (Imperial College London, trained on 3,291 hours of video), offline on this laptop's GPU.
+        Tested on silent mouthing of the 20 phrases by people it never saw, with no calibration. The matcher in the
+        blend only has OTHER people's recordings, exactly a patient on day one. From <code>scripts/eval_avsr.py</code>.</p>
+      <div id="lip" class="muted">Loading…</div>
+    </div>
+    <div class="card" style="margin-top:20px">
       <h2>Measured accuracy</h2>
       <p class="muted" id="method">Leave-one-out on the team's real calibration recordings: each sample is held out and
         matched against that same person's other samples. Nothing on this page is estimated.</p>

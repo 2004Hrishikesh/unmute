@@ -116,15 +116,16 @@ linearly, so thousands of recordings are fine.
 
 **19. What if the patient is too weak to calibrate, correct, or confirm much?**
 
-Then the first minute has to work with nothing from them. Unmute has a model trained on many healthy volunteers'
-recordings (4 minutes each on the Calibrate page), with augmentation standing in for thousands of videos. We test
-it the honest way, leave-one-person-out: train on everyone but one person, test on that person. With just 2 people
-the model plus matcher gets the right sentence on the first card 65.9% of the time (matcher alone 58.2%) and in the
-three cards 86.8% (83.5%). It is only switched on because that test says it is better, and only for patients without
-their own recordings; once they have some, their own samples win. Every volunteer makes day one better. Confirming
-can be hands-free (the first card speaks itself after a countdown) or a long blink, so a weak patient needs no hands.
-Honest limit: a patient with a tube in the mouth can't move their lips enough; Unmute is for tracheostomy and
-post-surgery patients whose lips are free.
+Then the first minute has to work with nothing from them, and that is what the open-source lip reader is for. On
+240 silent recordings by 2 people it never saw, no calibration, 20 phrases (chance 5%), the lip reader blended with
+other people's recordings put the right sentence on the first card 71.2% of the time and among the 3 cards 87.1%
+(other people's recordings alone: 37.9% / 65.0%). We also trained our own small model on volunteers' recordings, but
+tested the honest way (leave-one-person-out, 4 people) it did not beat the matcher, so it is switched off; we only
+switch on what measures better. Every confirmed or corrected sentence becomes the patient's own sample; with 2-3 of
+them a phrase is in the 3 cards about 85-90% of the time from the matcher alone. Confirming can be hands-free (the
+first card speaks itself after a countdown) or a long blink, so a weak patient needs no hands. Honest limit: a
+patient with a tube in the mouth can't move their lips enough; Unmute is for tracheostomy and post-surgery patients
+whose lips are free.
 
 **20. Do you use a real pretrained lip-reading model?**
 
@@ -132,5 +133,8 @@ Yes: Auto-AVSR from Imperial College London (open source, Apache 2.0), trained o
 error rate on the standard LRS3 benchmark. It runs on the laptop's GPU, offline, and needs no calibration and no
 training from us. We ask it how likely each phrase on the list is (fast and much more reliable than free text), blend
 that with the patient's own recordings, and also show its free-text reading as an extra card when it is confident.
-Honest limits: it was trained on people speaking aloud, and silent mouthing looks different; we measure it on our own
-mouths with `scripts/eval_avsr.py` before quoting a number. A patient always confirms before anything is spoken.
+Measured on our own silent mouthing (240 recordings, 2 people it never saw, 20 phrases): alone, zero-shot, 66.7%
+first card and 83.3% in the 3 cards; blended with other people's recordings 71.2% / 87.1%. It learned from people
+speaking aloud, and still reads silent mouthing. Its free text is exactly right only 56/240 times, so off-list
+sentences are a bonus: shown only when it is sure and the reading isn't just a list phrase, and never spoken without
+a confirm. Caveat: 2 people, and the blend weight was picked on the same recordings.

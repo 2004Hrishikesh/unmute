@@ -1,5 +1,6 @@
 """Open-source lip reader glue: crop alignment, frame-rate resampling, blending. The model itself is only
 smoke-tested when its weights are installed (third_party/, not in git)."""
+import json
 import base64
 
 import numpy as np
@@ -69,15 +70,32 @@ def test_real_model_scores_every_phrase():
 
 
 def test_free_text_goes_first_only_when_clearly_off_the_list():
-    phrases = {"I need water": -8.0, "Yes": -12.0, "Call the nurse": -15.0}
+    bad_fit = {"I need water": -12.0, "Yes": -12.0, "Call the nurse": -15.0}   # no list phrase fits the lips
+    good_fit = {"I need water": -2.0, "Yes": -12.0, "Call the nurse": -15.0}  # "I need water" fits well
     place = avsr.place_free_text
-    # said something not on the list, model sure of it: card 1
-    assert place("where is my phone", -0.5, -3.0, phrases) == {"show": True, "first": True}
-    # sure of it, but a list phrase is nearly as likely: extra card after the phrases
-    assert place("where is my phone", -0.5, -6.0, phrases) == {"show": True, "first": False}
+    # said something not on the list, model very sure, nothing on the list fits: card 1
+    assert place("where is my phone", -0.3, -1.5, bad_fit) == {"show": True, "first": True}
+    # sure, but a list phrase fits the lips: extra card after the phrases
+    assert place("where is my phone", -0.3, -1.5, good_fit) == {"show": True, "first": False}
+    # only fairly sure: extra card, never first
+    assert place("where is my phone", -0.6, -3.0, bad_fit) == {"show": True, "first": False}
     # garbage-level confidence (measured -1.6 to -1.9 on noise): hidden
-    assert place("we're going to talk about the", -1.7, -12.0, phrases)["show"] is False
-    # it IS a list phrase (any spelling): that card is already there
-    assert place("i need water.", -0.3, -2.0, phrases)["show"] is False
-    assert place("call the nurse", -0.3, -2.0, phrases)["show"] is False
-    assert place("", None, None, phrases)["show"] is False
+    assert place("we're going to talk about the", -1.7, -12.0, bad_fit)["show"] is False
+    # it IS a list phrase (any spelling), or a near-miss of one (measured: the usual case): hidden
+    assert place("i need water.", -0.3, -2.0, bad_fit)["show"] is False
+    assert place("i need one", -0.3, -1.4, bad_fit)["show"] is False
+    assert place("all the nurse", -0.2, -1.0, bad_fit)["show"] is False
+    assert place("", None, None, bad_fit)["show"] is False
+
+
+def test_new_patient_gets_its_own_measured_weight(tmp_path, monkeypatch):
+    from server import app as appmod
+
+    cfg = tmp_path / "avsr_config.json"
+    monkeypatch.setattr(appmod, "AVSR_CONFIG", cfg)
+    assert appmod.avsr_weight() == (appmod.AVSR_DEFAULT_WEIGHT, False)
+    cfg.write_text(json.dumps({"weight": 0.25, "weight_new": 0.6}))
+    assert appmod.avsr_weight(True) == (0.25, True)
+    assert appmod.avsr_weight(False) == (0.6, True)
+    cfg.write_text(json.dumps({"weight": 0.4}))  # older file without weight_new
+    assert appmod.avsr_weight(False) == (0.4, True)

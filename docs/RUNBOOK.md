@@ -18,12 +18,12 @@ His lips work, but no air reaches his voice box, so he cannot make a sound. He i
 **Who it's for:** patients whose lips move but whose voice doesn't: tracheostomy, after throat or neck surgery, some
 stroke and ALS patients. **Not** patients with a breathing tube *in the mouth* (the lips can't move).
 
-**The honest part about a brand-new patient.** With none of his own recordings, Unmute gets the right sentence on
-the **first card about 2 times in 3**, and **among the 3 cards about 6 times in 7** (measured, leave-one-person-out:
-65.9% / 86.8%). So most of the time he only has to pick card 2 or 3. When it's wrong, the touch board (him if he can
-touch, the nurse or family if not). Every correction is learned. With 4 of his own samples of a phrase it measured
-91% first card, 100% in the 3 cards. The open-source lip reader (Auto-AVSR) may push the first-day number up; it is
-**not measured on silent mouthing yet**: measure it tonight (below) before you say a number.
+**The honest part about a brand-new patient (measured 14 Nov 2026).** With none of his own recordings, the
+open-source lip reader plus other people's recordings puts the right sentence on the **first card about 7 times in
+10** and **among the 3 cards about 7 times in 8** (71.2% / 87.1%, 240 silent recordings by 2 people it never saw,
+20 phrases, chance 5%). Without the lip reader it was 37.9% / 65.0%. When it's wrong: the touch board (him if he can
+touch, the nurse or family if not). Every correction is learned; with 2-3 of his own samples of a phrase the
+matcher alone has it in the 3 cards ~85-90% of the time.
 
 ## What a weak patient uses (Settings → "What can this patient do?")
 
@@ -53,16 +53,25 @@ bash scripts/before_demo.sh rishi
 Open **Brave** at <http://localhost:8000>. Top right should say **lip reader on · MPS** and **Gemini context on**
 (or "offline mode": also fine).
 
-## Tonight, with 2 more people (about 30 minutes)
+## Numbers to say (all on the Proof page)
 
-1. **Each new person (about 4 min each):** Calibrate page → name (e.g. `amy`) → Phrases: **Volunteer** → hold Space,
-   mouth, let go, 60 times. Press **Next volunteer**. These recordings now also save mouth crops for the lip reader.
-2. **You or Rishi (about 4 min):** do the same once more under your own name, so the lip reader has your mouth too.
-3. Run `bash scripts/before_demo.sh rishi`. Read three numbers:
-   - step 3: *Brand-new patient* with **4 people**: the model + matcher vs matcher alone (fairer than with 2).
-   - step 4: **lip reader alone, zero-shot**: if this is good (say > 60% in the 3 cards), lead the pitch with it.
-   - step 5: everything OK.
-4. Commit the new recordings: `git add data/enrollments && git commit -m "Volunteer recordings" && git push`.
+| Say | Number | Where it comes from |
+| --- | --- | --- |
+| Brand-new patient, no calibration: right sentence in the 3 cards | **87%** (first card 71%) | lip reader + others' recordings, 240 silent recordings, 2 unseen people |
+| Lip reader alone, zero-shot | 83% in the 3 cards (67% first) | same |
+| Without the lip reader | 65% (38% first) | same recordings |
+| After the patient has used it (calibrated) + lip reader | 94% in the 3 cards (78% first) | same |
+| Chance with 20 phrases | 5% first card, 15% in the 3 cards | |
+
+Don't say "accurate lip reading of any sentence": free text was exactly right 56/240 times. Say "20 bedside
+phrases, plus a bonus free-text card when it's sure".
+
+## Before the demo (re-run any time you record more)
+
+1. More people make every number fairer: Calibrate → name → Phrases: **Volunteer** → hold Space, mouth, let go, 60
+   times → **Next volunteer**. Mouth crops are saved for the lip reader.
+2. `bash scripts/before_demo.sh rishi`: all 5 steps should finish; step 1 "passed", no "failed".
+3. Commit new recordings: `git add data/enrollments && git commit -m "More recordings" && git push`.
 
 ## The 4-minute demo
 
@@ -73,7 +82,7 @@ Open **Brave** at <http://localhost:8000>. Top right should say **lip reader on 
 | 1:15 | Mouth **"I cannot breathe"**, nod | Red screen, alarm, teammate holds up the phone (ntfy). "The nurse knew before he even confirmed." |
 | 1:45 | Mouth **"Thank you"** (weak phrase); if wrong, drag the round button, tap it, tap Thank you | "When it's wrong there's always a way out, and the mistake teaches it his lips." |
 | 2:30 | Settings → "Can only blink". Mouth **"No"**, close eyes on the lit card | "Whatever he can still move: head, finger, eyelid." |
-| 3:00 | Mouth something not on the list, e.g. **"Where is my phone"** | If the lip reader is sure it is off the list, its free text is **card 1** (dashed, "lip reader heard"); if less sure, it is an extra card after the 3 phrases; if unsure, it is hidden. Say: "An open-source lip reader trained on 3,000 hours of video, offline on this laptop." If nothing shows: skip it. Free text is never spoken without a confirm. |
+| 3:00 | Optional: mouth something not on the list, e.g. **"Where is my phone"**, big and slow | Free text is card 1 (dashed, "lip reader heard") only if the lip reader is very sure and no phrase fits; else an extra card or hidden. Free text was exactly right only 56/240 times, so **try it before the demo; if it doesn't show, skip this beat**. Either way say: "An open-source lip reader trained on 3,000 hours of video, offline on this laptop, reads a new patient with no calibration: right sentence in the 3 cards 87% of the time." |
 | 3:20 | Proof page | "Every number here is measured, the fair way: tested on a person the model never saw." |
 | 3:45 | Close | "Offline, no setup, learns each patient, and gets the nurse when it matters." |
 
@@ -83,7 +92,7 @@ Phrases that worked best for Rishi: *I need water, I cannot breathe, I am in pai
 ## Tests before the demo (tick each)
 
 Automatic (`bash scripts/before_demo.sh rishi`):
-- [ ] Tests: "69 passed" (or more), 0 failed
+- [ ] Tests: "74 passed" (or more), 0 failed
 - [ ] Readiness check: no FAIL lines
 
 By hand, in Brave:

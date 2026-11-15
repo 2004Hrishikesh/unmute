@@ -27,14 +27,19 @@ REPO = ROOT / "third_party" / "auto_avsr"
 WEIGHTS = ROOT / "third_party" / "weights" / "vsr_trlrs2lrs3vox2avsp_base.pth"
 FPS = 25.0                 # the model was trained on 25 fps video
 CTC_WEIGHT = 0.1           # the authors' decoding setting
-# Free text is only shown when the model is sure of it. Measured on garbage input (random noise, a blank grey
-# picture, a sliding texture): the model still "reads" TED-talk filler ("we're going to talk about the") at
-# -1.6 to -1.9 average log-probability per word piece. -0.8 sits well clear of that. Not yet measured on real
-# mouthing: re-check with scripts/eval_avsr.py, which prints the score of every reading.
-HEARD_MIN_LOGPROB = -1.2
-# Off the list: the free text is put FIRST when the model finds it this much more likely (log units) than the best
-# phrase on the list. 3.0 = about 20 times more likely. Not measured on real mouthing yet.
-OFF_LIST_MARGIN = 3.0
+# Free text (the lip reader's own reading, for sentences not on the list). Measured on 240 real silent-mouthing
+# recordings of list phrases (2 people, 14 Nov 2026; scripts/eval_avsr.py). The reading is usually a near miss of
+# the list phrase ("all my family", "called my family", "i'm in bed"), and a beam-searched sentence nearly always
+# scores higher than any list phrase, so "more likely than the list" put free text on card 1 wrongly 124/240 times.
+# Now free text is only shown when it is NOT a variant of a list phrase, and only first when, in addition, it is
+# very confident and no list phrase fits the lips. Measured: wrong card 1 on list phrases 4/240; with the true
+# phrase removed from the list (a stand-in for "said something off the list") free text was a right card 1 in 45/240
+# and a wrong one in 8/240. Thresholds were picked on those same recordings, so this is optimistic.
+# On garbage input (noise, a grey picture) the model "reads" TED-talk filler at -1.6 to -1.9 per word piece.
+HEARD_MIN_LOGPROB = -0.8    # shown at all (as an extra card): average log-probability per word piece
+FIRST_MIN_LOGPROB = -0.4    # shown FIRST: very confident
+LIST_SIMILAR = 0.6          # character similarity to a list phrase at or above which it counts as that phrase
+LIST_FIT_PER_WORD = -2.5    # no list phrase fits: best list score per word (+ end) below this
 
 
 def _norm(t: str) -> str:
@@ -44,16 +49,23 @@ def _norm(t: str) -> str:
     return re.sub(r"[^a-z ]+", "", t).strip()
 
 
+def _similar(a: str, b: str) -> float:
+    import difflib
+
+    return difflib.SequenceMatcher(None, _norm(a), _norm(b)).ratio()
+
+
 def place_free_text(text: str, text_conf: float | None, text_total: float | None, phrase_scores: dict) -> dict:
-    """Should the free-text reading be shown, and first? It is hidden when it is just a list phrase (that card is
-    already there) or when the model is not sure of it (garbage input scores -1.6 to -1.9 per word piece)."""
+    """Should the free-text reading be shown, and first? Hidden when the model is not sure of it or when it is
+    just a (mis)reading of a list phrase: that phrase's card is already there and is cleaner. First only when it
+    is very confident AND no list phrase fits the lips well."""
     text = (text or "").strip()
     if not text or text_conf is None or text_conf <= HEARD_MIN_LOGPROB:
         return {"show": False, "first": False}
-    if _norm(text) in {_norm(p) for p in phrase_scores}:
+    if phrase_scores and max(_similar(text, p) for p in phrase_scores) >= LIST_SIMILAR:
         return {"show": False, "first": False}
-    best = max(phrase_scores.values()) if phrase_scores else -1e9
-    return {"show": True, "first": text_total is not None and text_total - best > OFF_LIST_MARGIN}
+    best_fit = max((s / (len(_norm(p).split()) + 1) for p, s in phrase_scores.items()), default=-1e9)
+    return {"show": True, "first": text_conf > FIRST_MIN_LOGPROB and best_fit < LIST_FIT_PER_WORD}
 
 _lock = threading.Lock()
 _state: dict = {"model": None, "error": None, "device": None, "spm": None, "units": None, "token_list": None}

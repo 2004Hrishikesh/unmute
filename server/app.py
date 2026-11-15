@@ -249,11 +249,12 @@ def decode_crops(c: dict | None) -> np.ndarray | None:
     return avsr.mouth_crops(frames, np.stack(points))
 
 
-def avsr_weight() -> tuple[float, bool]:
-    """(weight of the lip reader in the blend, measured?)"""
+def avsr_weight(personal: bool = True) -> tuple[float, bool]:
+    """(weight of the lip reader in the blend, measured?). A brand-new patient's matcher only has other people's
+    recordings, so it is weaker and the lip reader gets its own, measured weight ("weight_new")."""
     try:
         cfg = json.loads(AVSR_CONFIG.read_text())
-        return float(cfg["weight"]), True
+        return float(cfg["weight"] if personal else cfg.get("weight_new", cfg["weight"])), True
     except Exception:
         return AVSR_DEFAULT_WEIGHT, False
 
@@ -407,8 +408,19 @@ def health():
 def status():
     rerank.init()
     weight, measured = avsr_weight()
+    weight_new, _ = avsr_weight(False)
     return {"gemini": rerank.status(), "ntfy_topic": NTFY_TOPIC, "bed": BED, "model": model_info(),
-            "lip_reader": {**avsr.status(), "weight": weight, "weight_measured": measured}}
+            "lip_reader": {**avsr.status(), "weight": weight, "weight_new": weight_new,
+                                                 "weight_measured": measured}}
+
+
+@app.get("/api/lip_reader")
+def lip_reader_report():
+    """The lip reader's measurement on our own silent mouthing (Proof page), from scripts/eval_avsr.py."""
+    try:
+        return {"report": json.loads(AVSR_CONFIG.read_text())}
+    except Exception:
+        return {"report": None}
 
 
 @app.get("/api/model")
@@ -525,7 +537,7 @@ async def predict(body: PredictIn):
                         return avsr.read_lips(crops, PHRASES["phrases"])
                 lip = await asyncio.to_thread(run)
                 ranked_all = await asyncio.to_thread(rec.rank, body.frames, 999)
-                weight, _ = avsr_weight()
+                weight, _ = avsr_weight(info["personal"])
                 candidates = blend_with_lip_reader(ranked_all, lip, weight)[:5]
                 recogniser = "lip reader+" + recogniser
                 lip_timing = {**lip["timing"], "text": lip["text"], "text_conf": lip["text_conf"],

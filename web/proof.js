@@ -127,7 +127,29 @@ async function loadModel() {
     el.innerHTML = html;
   } catch (e) { el.textContent = e.message; }
 }
-async function load() { loadUsage(); loadModel(); try { render((await api("/api/results")).results); } catch (e) { $("#content").textContent = e.message; } }
+async function loadLip() {
+  const el = $("#lip");
+  try {
+    const { report: r } = await api("/api/lip_reader");
+    if (!r || !r.new_patient) { el.innerHTML = "Not measured yet. Record on the Calibrate page with the lip reader installed, then run <code>.venv/bin/python scripts/eval_avsr.py</code>."; return; }
+    const np = r.new_patient, w = String(r.weight_new), alone = np["1.0"], matcher = np["0.0"], best = np[w] || np[String(Number(w).toFixed(1))];
+    const ft = r.free_text || {};
+    el.innerHTML = `<div class="stats">
+      <div class="stat"><div class="v">${pct(best.top1)}</div><div class="k">First card, brand-new patient (lip reader + matcher)</div></div>
+      <div class="stat"><div class="v">${pct(best.top3)}</div><div class="k">In the 3 cards, brand-new patient</div></div>
+      <div class="stat"><div class="v">${r.n}</div><div class="k">Silent recordings, ${r.people} people</div></div>
+      <div class="stat"><div class="v">5%</div><div class="k">Chance (20 phrases)</div></div></div>
+      <table><thead><tr><th>Brand-new patient, no calibration</th><th>First card</th><th>In the 3 cards</th></tr></thead><tbody>
+      <tr><td>Matcher alone (other people's recordings)</td><td>${pct(matcher.top1)}</td><td>${pct(matcher.top3)}</td></tr>
+      <tr><td>Lip reader alone, zero-shot</td><td>${pct(alone.top1)}</td><td>${pct(alone.top3)}</td></tr>
+      <tr><td><b>Deployed: lip reader + matcher</b> <span class="muted small">weight ${esc(w)}</span></td><td><b>${pct(best.top1)}</b></td><td><b>${pct(best.top3)}</b></td></tr>
+      </tbody></table>
+      <p class="muted small" style="margin-top:10px">Free text on these list phrases: wrongly put on card 1 ${ft.first ?? "?"}/${ft.n ?? "?"} times.
+        Simulated off-list sentence (the true phrase taken off the list): free text right on card 1 ${ft.off_first_right ?? "?"}/${ft.n ?? "?"}.
+        The blend weight and free-text thresholds were chosen on these same recordings. Measured ${esc(r.measured_at || "")}.</p>`;
+  } catch (e) { el.textContent = e.message; }
+}
+async function load() { loadLip(); loadUsage(); loadModel(); try { render((await api("/api/results")).results); } catch (e) { $("#content").textContent = e.message; } }
 $("#runBtn").addEventListener("click", async () => {
   $("#runBtn").disabled = true; $("#runBtn").textContent = "Running…";
   try { render((await api("/api/evaluate", { method: "POST" })).results); }

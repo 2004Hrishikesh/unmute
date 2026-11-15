@@ -64,7 +64,7 @@ else:
     line("WARN", "No starter model: nobody else has recorded on this laptop", "the 'judge' moment in the demo script needs at least one other person's recordings")
 lr = st.get("lip_reader") or {}
 if lr.get("installed") and lr.get("error") is None:
-    line("OK", f"Open-source lip reader installed ({lr.get('device') or 'not loaded yet'}), blend weight {lr.get('weight')}"
+    line("OK", f"Open-source lip reader installed ({lr.get('device') or 'not loaded yet'}), blend weight {lr.get('weight')} (new patient {lr.get('weight_new')})"
          + (" (measured)" if lr.get("weight_measured") else " (default: not measured on our mouths yet)"))
     if not lr.get("weight_measured"):
         line("WARN", "Lip reader not measured on our mouths", "record on Calibrate (crops are saved), then: .venv/bin/python scripts/eval_avsr.py")
