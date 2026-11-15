@@ -31,7 +31,29 @@ CTC_WEIGHT = 0.1           # the authors' decoding setting
 # picture, a sliding texture): the model still "reads" TED-talk filler ("we're going to talk about the") at
 # -1.6 to -1.9 average log-probability per word piece. -0.8 sits well clear of that. Not yet measured on real
 # mouthing: re-check with scripts/eval_avsr.py, which prints the score of every reading.
-HEARD_MIN_LOGPROB = -0.8
+HEARD_MIN_LOGPROB = -1.2
+# Off the list: the free text is put FIRST when the model finds it this much more likely (log units) than the best
+# phrase on the list. 3.0 = about 20 times more likely. Not measured on real mouthing yet.
+OFF_LIST_MARGIN = 3.0
+
+
+def _norm(t: str) -> str:
+    import re
+
+    t = t.lower().replace("i'm", "i am").replace("can't", "cannot").replace("cant", "cannot")
+    return re.sub(r"[^a-z ]+", "", t).strip()
+
+
+def place_free_text(text: str, text_conf: float | None, text_total: float | None, phrase_scores: dict) -> dict:
+    """Should the free-text reading be shown, and first? It is hidden when it is just a list phrase (that card is
+    already there) or when the model is not sure of it (garbage input scores -1.6 to -1.9 per word piece)."""
+    text = (text or "").strip()
+    if not text or text_conf is None or text_conf <= HEARD_MIN_LOGPROB:
+        return {"show": False, "first": False}
+    if _norm(text) in {_norm(p) for p in phrase_scores}:
+        return {"show": False, "first": False}
+    best = max(phrase_scores.values()) if phrase_scores else -1e9
+    return {"show": True, "first": text_total is not None and text_total - best > OFF_LIST_MARGIN}
 
 _lock = threading.Lock()
 _state: dict = {"model": None, "error": None, "device": None, "spm": None, "units": None, "token_list": None}
@@ -215,12 +237,15 @@ def read_lips(crops: np.ndarray, phrases: list[str], free_text: bool = True) -> 
     scores = score_phrases(crops, phrases)
     t1 = time.time()
     text = transcribe(crops) if free_text else ""
-    text_conf = None
+    text_conf = text_total = None
     if text:
-        text_conf = score_phrases(crops, [text])[text] / (len(_ids(text)) + 1)  # per word piece, incl. end
+        text_total = score_phrases(crops, [text])[text]
+        text_conf = text_total / (len(_ids(text)) + 1)  # per word piece, incl. end
     vals = np.array(list(scores.values()))
     p = np.exp(vals - vals.max()); p /= p.sum()
+    place = place_free_text(text, text_conf, text_total, scores)
     return {"scores": scores, "proba": dict(zip(scores, p.tolist())), "text": text,
             "text_conf": None if text_conf is None else round(float(text_conf), 3),
-            "text_shown": bool(text) and text_conf is not None and text_conf > HEARD_MIN_LOGPROB,
+            "text_total": None if text_total is None else round(float(text_total), 3),
+            "text_shown": place["show"], "text_first": place["first"],
             "timing": {"score_s": round(t1 - t0, 3), "text_s": round(time.time() - t1, 3), "frames": len(crops)}}

@@ -66,3 +66,18 @@ def test_real_model_scores_every_phrase():
     out = avsr.read_lips(crops, ["I need water", "Yes", "Call the nurse"], free_text=False)
     assert set(out["proba"]) == {"I need water", "Yes", "Call the nurse"}
     assert abs(sum(out["proba"].values()) - 1) < 1e-6 and all(np.isfinite(list(out["scores"].values())))
+
+
+def test_free_text_goes_first_only_when_clearly_off_the_list():
+    phrases = {"I need water": -8.0, "Yes": -12.0, "Call the nurse": -15.0}
+    place = avsr.place_free_text
+    # said something not on the list, model sure of it: card 1
+    assert place("where is my phone", -0.5, -3.0, phrases) == {"show": True, "first": True}
+    # sure of it, but a list phrase is nearly as likely: extra card after the phrases
+    assert place("where is my phone", -0.5, -6.0, phrases) == {"show": True, "first": False}
+    # garbage-level confidence (measured -1.6 to -1.9 on noise): hidden
+    assert place("we're going to talk about the", -1.7, -12.0, phrases)["show"] is False
+    # it IS a list phrase (any spelling): that card is already there
+    assert place("i need water.", -0.3, -2.0, phrases)["show"] is False
+    assert place("call the nurse", -0.3, -2.0, phrases)["show"] is False
+    assert place("", None, None, phrases)["show"] is False

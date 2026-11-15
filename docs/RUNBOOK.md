@@ -73,7 +73,7 @@ Open **Brave** at <http://localhost:8000>. Top right should say **lip reader on 
 | 1:15 | Mouth **"I cannot breathe"**, nod | Red screen, alarm, teammate holds up the phone (ntfy). "The nurse knew before he even confirmed." |
 | 1:45 | Mouth **"Thank you"** (weak phrase); if wrong, drag the round button, tap it, tap Thank you | "When it's wrong there's always a way out, and the mistake teaches it his lips." |
 | 2:30 | Settings → "Can only blink". Mouth **"No"**, close eyes on the lit card | "Whatever he can still move: head, finger, eyelid." |
-| 3:00 | Mouth something not on the list, e.g. **"Where is my phone"** | If the dashed "lip reader heard" card appears: "An open-source lip reader trained on 3,000 hours of video, running offline on this laptop." If not: skip it. |
+| 3:00 | Mouth something not on the list, e.g. **"Where is my phone"** | If the lip reader is sure it is off the list, its free text is **card 1** (dashed, "lip reader heard"); if less sure, it is an extra card after the 3 phrases; if unsure, it is hidden. Say: "An open-source lip reader trained on 3,000 hours of video, offline on this laptop." If nothing shows: skip it. Free text is never spoken without a confirm. |
 | 3:20 | Proof page | "Every number here is measured, the fair way: tested on a person the model never saw." |
 | 3:45 | Close | "Offline, no setup, learns each patient, and gets the nurse when it matters." |
 

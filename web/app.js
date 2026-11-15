@@ -23,7 +23,7 @@ let spokenTimer = null;
 let lastLearnedId = null, lastLogId = null, lastConfirmAt = 0, PHRASES = [];
 let atOpen = false;
 // Open-source lip reader: free-text reading of the last recording, offered as an extra card.
-let heard = null, lipReader = { installed: false };
+let heard = null, heardFirst = false, lipReader = { installed: false };
 const lipToggle = $("#lipToggle");
 lipToggle.checked = settings.get("lipReader", true);
 lipToggle.addEventListener("change", () => { settings.set("lipReader", lipToggle.checked); applyLipReader(); });
@@ -102,6 +102,7 @@ let autoTimer = null;
 function startAutoConfirm() {
   stopAutoConfirm();
   if (!autoMode() || mode() !== "nod" || autoConfirmMs <= 0 || state !== "choosing") return;
+  if (options()[selected] === heard) return; // free text is never spoken without a real confirmation
   autoTimer = setTimeout(() => { if (state === "choosing") confirm(selected, "auto"); }, autoConfirmMs);
 }
 function stopAutoConfirm() { clearTimeout(autoTimer); autoTimer = null; }
@@ -268,7 +269,11 @@ function renderChoices() {
 }
 
 // The 3 cards, then the open lip reader's free text (when it read something not on the list), then "try again".
-function options() { return choices.concat(heard ? [heard] : [], [RETRY]); }
+// When the lip reader is sure the patient said something NOT on the list, its free text is card 1.
+function options() {
+  if (heard && heardFirst) return [heard].concat(choices, [RETRY]);
+  return choices.concat(heard ? [heard] : [], [RETRY]);
+}
 
 function moveSelection(delta, auto = false) {
   const n = options().length;
@@ -309,6 +314,7 @@ async function onRecorded(rec) {
     refreshStatus();
     choices = r.choices;
     heard = r.heard || null;
+    heardFirst = !!(r.heard && r.heard_first);
     confidences = Object.fromEntries(r.candidates.map((c) => [c.phrase, c.confidence]));
     selected = 0;
     choiceShownAt = performance.now();
@@ -321,6 +327,7 @@ async function onRecorded(rec) {
     if (r.source === "starter") reasonEl.textContent = (r.recogniser === "model+matcher"
       ? "Model trained on many people (no calibration yet). " : "Starter model (no calibration yet). ") + reasonEl.textContent;
     preAlert(choices[0]);
+    if (heardFirst) reasonEl.textContent = "Not on the list? The lip reader read this as free text. " + reasonEl.textContent;
     renderDebug(r);
   } catch (e) {
     setState("idle", { msg: "Could not read that: " + e.message });
@@ -334,7 +341,7 @@ async function confirm(i, method) {
   if (sentence === undefined) return;
   if (sentence === RETRY) { setState("idle", { msg: "OK, try again." }); nudgeTouch(); return; }
   if (sentence === heard) { await sayAndLog(sentence, method, null, { learn: false }); return; } // free text: not a list phrase
-  await sayAndLog(sentence, method, i);
+  await sayAndLog(sentence, method, choices.indexOf(sentence));
 }
 
 // Speak a sentence the patient chose and log it. rank = its position among the cards (0-2), or -1 if it

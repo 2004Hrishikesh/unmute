@@ -514,7 +514,7 @@ async def predict(body: PredictIn):
     t0 = time.time()
     candidates, recogniser = await asyncio.to_thread(rank_with_model, rec, body.frames, body.dims, info["personal"])
     t_cls = time.time() - t0
-    heard, lip_timing = None, None
+    heard, heard_first, lip_timing = None, False, None
     lips_moved = features.lip_motion(features.to_array(body.frames), int((body.dims or {}).get("bs", 28))) >= MIN_LIP_MOTION
     if body.crops and lips_moved and avsr.available():
         try:
@@ -528,10 +528,11 @@ async def predict(body: PredictIn):
                 weight, _ = avsr_weight()
                 candidates = blend_with_lip_reader(ranked_all, lip, weight)[:5]
                 recogniser = "lip reader+" + recogniser
-                lip_timing = {**lip["timing"], "text": lip["text"], "text_conf": lip["text_conf"]}
-                text = lip["text"].strip()
-                if lip["text_shown"] and text.lower().rstrip(".") not in {p.lower() for p in PHRASES["phrases"]}:
-                    heard = text[:120]
+                lip_timing = {**lip["timing"], "text": lip["text"], "text_conf": lip["text_conf"],
+                              "best_phrase_score": round(max(lip["scores"].values()), 3), "text_score": lip["text_total"]}
+                if lip["text_shown"]:
+                    heard = lip["text"].strip()[:120]
+                    heard_first = lip["text_first"]
         except Exception as e:
             lip_timing = {"error": f"{type(e).__name__}: {e}"[:200]}
     history = [
@@ -549,6 +550,7 @@ async def predict(body: PredictIn):
         "source": "personal" if info["personal"] else "starter",
         "recogniser": recogniser,
         "heard": heard,
+        "heard_first": heard_first,  # the patient probably said something not on the list: show it as card 1
         "lip_reader": lip_timing,
         "own_samples": info["own_samples"],
         "starter_samples": info["starter_samples"],
