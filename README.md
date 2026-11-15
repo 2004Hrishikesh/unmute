@@ -67,7 +67,19 @@ Unmute is a communication aid. It is not a medical device and it does not diagno
 - **Pre-alert before confirmation.** The moment the best guess is an urgent phrase, the nurse page and phone get a
   "Possible (not yet confirmed)" alert (Settings toggle, on by default). The sentence the patient then confirms
   supersedes it; a false alarm costs the nurse a glance, a missed "I cannot breathe" costs more.
-- **Bed-light check.** If the camera image is too dark, the screen says "Turn on the bed light: too dark to read lips".
+- **Touch board (assistive touch).** A floating button the patient can drag anywhere on the screen. Tap it (or press
+  `T`) for every sentence as a big button, urgent ones first. It is the way out when lip reading is wrong, the room is
+  dark, or the camera can't see the face. When it corrects a lip reading, the recording is learned under the sentence
+  the patient picked; when the patient already confirmed the wrong card, `/api/relabel` moves the learned recording to
+  the right phrase so the model is not taught the mistake.
+- **Live accuracy.** Every confirmed sentence is logged with its card position (0-2, or -1 for the touch board). The
+  Proof page shows first card / in three cards / fixed on the board from real use (`GET /api/usage`).
+- **Dark room.** If the camera image is too dark: a banner, the screen edge becomes a ring light for the face, and the
+  face tracker gets a brightened copy of the image. The light stays on until the room is clearly bright without it.
+  Not yet measured in a dark room.
+- **Scales to many recordings.** The all-pairs DTW behind the hubness correction runs in row blocks, so memory grows
+  linearly: measured 2.4 GB at 300 recordings before, 1.0 GB at 300 and 2.9 GB at 1,200 after (same results). Above
+  400 recordings a new one is folded in by a background rebuild (4.4 s at 1,200) while predictions keep going.
 
 ## Setup
 
@@ -149,6 +161,23 @@ run, before the hubness correction, Gemini answered 28 of the 80 calls before th
 back offline). In all 28 it kept the classifier's order, so accuracy did not change. That shows it does not make
 lip reading worse without context. Its benefit with real context has not been measured.
 
+**Learning from use, replayed** (`learning` in `data/results.json`): a person starts with none of their own recordings;
+their recordings are replayed in recording order, each predicted first and then learned under its true phrase (what
+confirming or correcting on the touch board does). By how many own samples of that phrase Unmute already had:
+
+| Own samples of the phrase | 0 | 1 | 2 | 3 | 4+ |
+| --- | --- | --- | --- | --- | --- |
+| Top-1 | 55.0% | 46.7% | 80.0% | 70.0% | 90.9% |
+| Top-3 | 85.0% | 73.3% | 93.3% | 93.3% | 100.0% |
+| Recordings | 20 | 30 | 30 | 30 | 22 |
+
+The dip at 1 is kesh's 10 phrases nobody else recorded: their first match is against a single template. Samples of one
+phrase were recorded one after another, so this is a little optimistic. Urgent phrases as deployed (pooled,
+held out): 86.5% top-1, 97.3% top-3 over 37 recordings.
+
+**Tests.** `.venv/bin/python -m pytest -q` (56 tests). `tests/test_real_accuracy.py` runs on the real recordings in
+`data/enrollments` when present and fails if accuracy drops below floors set just under the measured numbers.
+
 ## API contract
 
 All JSON. A frame is a flat list of floats: `[mouth blendshapes (dims.bs) | lip x,y pairs (dims.lip)]`.
@@ -159,9 +188,11 @@ All JSON. A frame is a flat list of floats: `[mouth blendshapes (dims.bs) | lip 
 | `GET /api/enrollments?user=` | | `{user, counts, own_samples, own_from_use, personal, starter_available, starter_samples, starter_users}` |
 | `DELETE /api/enrollments/last?user=` | | `{ok, deleted}` |
 | `POST /api/predict` | `{user, frames, note, local_time, use_gemini}` | `{candidates: [{phrase, distance, confidence}] (top 5), choices: [3], mode: "gemini"\|"offline", reason, source: "personal"\|"starter", timing}` |
-| `POST /api/log` | `{user, sentence, method, mode, learn?, frames?, dims?, fps?}` | the stored row, incl. `urgent`, `push`, `learned` |
+| `POST /api/log` | `{user, sentence, method, mode, learn?, frames?, dims?, fps?, rank?, corrects?}` | the stored row, incl. `urgent`, `push`, `learned`, `learned_id` |
 | `GET /api/requests` | | `{requests: [...newest first], unacknowledged_urgent}` |
 | `POST /api/ack` | `{id}` (or `"all"`) | `{ok}` |
+| `POST /api/relabel` | `{user, id, phrase}` | `{ok, id, from, to}`; only samples learned from use |
+| `GET /api/usage?user=` | | `{n, top1, top3, touch_board, corrections}` from real use |
 | `GET /api/results` / `POST /api/evaluate` | | leave-one-out results |
 | `GET /api/status` | | Gemini availability, ntfy topic, bed |
 

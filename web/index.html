@@ -26,7 +26,8 @@
       <div id="cam" class="cam">
         <video id="video" playsinline muted></video>
         <canvas id="overlay"></canvas>
-        <div id="darkBanner" class="dark-banner hidden">Turn on the bed light: too dark to read lips.</div>
+        <div id="darkBanner" class="dark-banner hidden"><span id="darkText">Turn on the bed light: too dark to read lips.</span>
+          <button id="lightOff" class="btn small hidden">Screen light off</button></div>
         <div id="recDot" class="rec-dot hidden">● REC</div>
         <div id="camMsg" class="cam-msg">Starting camera…</div>
       </div>
@@ -76,6 +77,8 @@
           <label class="nod-only">Shake threshold (degrees): <span id="yawTVal"></span>
             <input id="yawT" type="range" min="4" max="30" step="1" />
           </label>
+          <label class="row"><input id="faceLightToggle" type="checkbox" checked /> When it is too dark, light the patient's face with the screen and brighten the camera image</label>
+          <label class="row"><input id="atToggle" type="checkbox" checked /> Show the touch button (drag it anywhere; tap it to pick any sentence)</label>
           <label>Darkness threshold (0–255): <span id="darkTVal"></span>
             <input id="darkT" type="range" min="10" max="120" step="1" />
           </label>
@@ -93,6 +96,22 @@
       <div id="reason" class="reason"></div>
     </section>
   </main>
+
+  <button id="atBtn" class="at-btn" aria-label="Touch board: pick any sentence" title="Drag me anywhere. Tap to pick any sentence.">
+    <span class="at-ring"></span><span class="at-dots"><i></i><i></i><i></i><i></i></span>
+  </button>
+  <div id="atPanel" class="at-panel hidden" role="dialog" aria-modal="true" aria-labelledby="atTitle">
+    <div class="at-sheet">
+      <div class="at-head">
+        <div>
+          <div id="atTitle" class="at-title">Tap a sentence to say it</div>
+          <div id="atSub" class="at-sub"></div>
+        </div>
+        <button id="atClose" class="btn at-close">Close <kbd>Esc</kbd></button>
+      </div>
+      <div id="atGrid" class="at-grid"></div>
+    </div>
+  </div>
 
   <div id="urgent" class="urgent hidden">
     <p>URGENT REQUEST</p>

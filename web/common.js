@@ -284,6 +284,17 @@ export class FaceTracker {
   constructor(video, landmarker, onFrame) {
     this.video = video; this.lm = landmarker; this.onFrame = onFrame;
     this.lastTs = -1; this.running = false; this.fps = 0; this._times = [];
+    // Dark room: >1 brightens the image the face tracker sees (the camera feed itself is untouched).
+    this.gain = 1; this._canvas = null; this._ctx = null;
+  }
+  _source(v) {
+    if (this.gain <= 1.01) return v;
+    if (!this._canvas) { this._canvas = document.createElement("canvas"); this._ctx = this._canvas.getContext("2d"); }
+    const c = this._canvas;
+    if (c.width !== v.videoWidth || c.height !== v.videoHeight) { c.width = v.videoWidth; c.height = v.videoHeight; }
+    this._ctx.filter = `brightness(${this.gain.toFixed(2)}) contrast(1.15)`;
+    this._ctx.drawImage(v, 0, 0, c.width, c.height);
+    return c;
   }
   start() { this.running = true; const loop = () => { if (!this.running) return; this.tick(); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
   stop() { this.running = false; }
@@ -294,7 +305,7 @@ export class FaceTracker {
     if (ts <= this.lastTs) ts = this.lastTs + 1;
     this.lastTs = ts;
     let res;
-    try { res = this.lm.detectForVideo(v, ts); } catch (e) { console.warn(e); return; }
+    try { res = this.lm.detectForVideo(this._source(v), ts); } catch (e) { console.warn(e); return; }
     this._times.push(ts); while (this._times.length && ts - this._times[0] > 1000) this._times.shift();
     this.fps = this._times.length;
     this.onFrame(extractFrame(res, v.videoWidth, v.videoHeight), ts);

@@ -41,6 +41,26 @@ function render(res) {
     html += "</tbody></table>";
   }
 
+  // Learning from use: start with no own recordings, replay them in order, learn each after predicting it.
+  const lr = res.learning && res.learning.overall ? Object.entries(res.learning.overall) : [];
+  if (lr.length) {
+    html += `<h2 style="margin-top:24px">Learning from use</h2>
+      <p class="muted">A person starts with none of their own recordings, only other people's. Their recordings are replayed in
+      the order they were made: each is predicted first, then learned under its true phrase (what confirming a card or
+      fixing it on the touch board does). Grouped by how many of their own samples of that phrase Unmute already had.</p>
+      <div class="curve">`;
+    for (const [b, v] of lr) {
+      const label = +b === res.learning.max_bucket ? `${b}+` : b;
+      html += `<div class="curve-col"><div class="curve-bars">
+          <div class="bar t3" style="height:${(100 * v.top3).toFixed(0)}%" title="top-3 ${pct(v.top3)}"></div>
+          <div class="bar t1" style="height:${(100 * v.top1).toFixed(0)}%" title="top-1 ${pct(v.top1)}"></div>
+        </div><div class="curve-v"><b>${pct(v.top1)}</b> / ${pct(v.top3)}</div>
+        <div class="curve-k">${label} own sample${label === "1" ? "" : "s"}<br><span class="muted small">${v.n} recordings</span></div></div>`;
+    }
+    html += `</div><p class="muted small">Top-1 (solid) / top-3 (light). Caveat: our samples of one phrase were recorded one after
+      another, so this is a little easier than samples made hours apart.</p>`;
+  }
+
   // Most-confused pairs across users.
   const conf = {};
   for (const r of Object.values(res.users)) for (const c of r.confusions) {
@@ -70,7 +90,19 @@ function render(res) {
   el.innerHTML = html;
 }
 
-async function load() { try { render((await api("/api/results")).results); } catch (e) { $("#content").textContent = e.message; } }
+async function loadUsage() {
+  try {
+    const u = await api("/api/usage");
+    const el = $("#usage");
+    if (!u.n) { el.innerHTML = `<p class="muted">No confirmed sentences with a recorded card position yet. Use the Patient page, then come back.</p>`; return; }
+    el.innerHTML = `<div class="stats">
+      <div class="stat"><div class="v">${pct(u.top1)}</div><div class="k">Right on the first card</div></div>
+      <div class="stat"><div class="v">${pct(u.top3)}</div><div class="k">Right sentence among the 3 cards</div></div>
+      <div class="stat"><div class="v">${u.corrections}</div><div class="k">Fixed on the touch board (and learned)</div></div>
+      <div class="stat"><div class="v">${u.n}</div><div class="k">Confirmed sentences</div></div></div>`;
+  } catch {}
+}
+async function load() { loadUsage(); try { render((await api("/api/results")).results); } catch (e) { $("#content").textContent = e.message; } }
 $("#runBtn").addEventListener("click", async () => {
   $("#runBtn").disabled = true; $("#runBtn").textContent = "Running…";
   try { render((await api("/api/evaluate", { method: "POST" })).results); }

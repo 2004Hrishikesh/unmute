@@ -186,3 +186,60 @@ code { background: var(--panel-2); padding: 2px 6px; border-radius: 6px; }
 @keyframes scanfill { to { width: 100%; } }
 .choice.blinking { box-shadow: inset 0 0 0 999px rgba(94, 234, 212, calc(var(--blink, 0) * 0.35)); }
 .check-warn { color: var(--warn); font-weight: 700; }
+
+/* ---------- assistive touch: a floating button the patient can drag anywhere, tap = phrase board */
+.at-btn {
+  position: fixed; z-index: 45; width: 76px; height: 76px; border-radius: 22px; border: none; padding: 0;
+  background: rgba(24, 35, 58, 0.82); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); touch-action: none; user-select: none; display: grid; place-items: center;
+  transition: left 0.22s ease, top 0.22s ease, opacity 0.2s, transform 0.12s; opacity: 0.88;
+}
+.at-btn.dragging { transition: none; opacity: 1; transform: scale(1.08); }
+.at-btn:hover, .at-btn:focus-visible { opacity: 1; outline: 3px solid var(--accent); outline-offset: 2px; }
+.at-btn .at-ring { position: absolute; inset: 12px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.55); }
+.at-btn .at-dots { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; position: relative; }
+.at-btn .at-dots i { width: 11px; height: 11px; border-radius: 50%; background: var(--accent); display: block; }
+.at-btn.nudge { animation: nudge 1.2s ease 2; }
+@keyframes nudge { 30% { transform: scale(1.18); box-shadow: 0 0 0 10px rgba(94, 234, 212, 0.35); } }
+.at-panel {
+  position: fixed; inset: 0; z-index: 48; background: rgba(4, 8, 16, 0.72); display: flex;
+  align-items: flex-end; justify-content: center; padding: 16px;
+}
+.at-sheet {
+  width: min(1100px, 100%); max-height: 92vh; overflow-y: auto; background: var(--panel);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; animation: rise 0.18s ease;
+}
+@keyframes rise { from { transform: translateY(24px); opacity: 0; } }
+.at-head { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
+.at-title { font-size: clamp(1.4rem, 2.6vw, 2rem); font-weight: 800; }
+.at-sub { color: var(--muted); font-size: 1.05rem; margin-top: 4px; }
+.at-close { margin-left: auto; flex: none; font-size: 1.1rem; padding: 12px 18px; }
+.at-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.at-item {
+  min-height: 84px; padding: 14px 16px; border-radius: 16px; border: 3px solid var(--line); background: var(--panel-2);
+  color: var(--text); font-size: clamp(1.15rem, 1.8vw, 1.45rem); font-weight: 700; text-align: left; line-height: 1.2;
+}
+.at-item:hover, .at-item:focus-visible { border-color: var(--accent); outline: none; }
+.at-item.urgent-item { border-color: #7f1d1d; background: #3a1418; }
+.at-item.urgent-item:hover { border-color: var(--danger); }
+.at-item.on-card { border-style: dashed; }
+.at-item .tag { display: block; font-size: 0.8rem; color: var(--muted); font-weight: 600; margin-top: 4px; }
+
+/* ---------- dark room: the screen becomes a ring light for the patient's face */
+body.facelight::after {
+  content: ""; position: fixed; inset: 0; z-index: 40; pointer-events: none;
+  border: min(7vmin, 70px) solid #fff8ec; box-shadow: inset 0 0 120px 40px rgba(255, 248, 236, 0.85);
+}
+.dark-banner { display: flex; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.dark-banner .btn { background: #241a00; color: var(--warn); border-color: #241a00; padding: 6px 12px; }
+@media (prefers-reduced-motion: reduce) { .at-btn, .at-btn.nudge, .at-sheet { transition: none; animation: none; } }
+
+/* ---------- proof: learning curve */
+.curve { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 14px; margin: 14px 0 6px; }
+.curve-col { background: var(--panel-2); border-radius: 14px; padding: 14px; text-align: center; }
+.curve-bars { position: relative; height: 140px; margin: 0 auto 10px; width: 54px; }
+.curve-bars .bar { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 8px 8px 3px 3px; }
+.curve-bars .bar.t3 { background: rgba(94, 234, 212, 0.28); }
+.curve-bars .bar.t1 { background: var(--accent); left: 9px; right: 9px; }
+.curve-v { font-size: 1.05rem; }
+.curve-k { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }

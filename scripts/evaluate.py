@@ -73,6 +73,12 @@ def main():
         if "gemini_top3" in r:
             line += f", with Gemini top-1 {r['gemini_top1']:.1%} top-3 {r['gemini_top3']:.1%} (Gemini answered {r['gemini_answered']}/{r['samples']}, changed the order {r['gemini_changed_order']} times)"
         print(line)
+    lr = res.get("learning") or {}
+    if lr.get("overall"):
+        print("Learning from use (start with no own recordings; replay, predict, then learn the true phrase):")
+        for b, v in lr["overall"].items():
+            label = f"{b}+" if int(b) == lr["max_bucket"] else b
+            print(f"  {label:>2} own samples of that phrase: top-1 {v['top1']:.1%}, top-3 {v['top3']:.1%} ({v['n']} recordings)")
     print(f"Saved to {RESULTS_FILE.relative_to(ROOT)}")
 
 

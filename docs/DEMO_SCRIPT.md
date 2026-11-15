@@ -104,6 +104,24 @@ Teammate clicks **Acknowledge** on the Nurse page. The alarm stops on the patien
 
 > "When the nurse acknowledges it, the patient sees that help is coming."
 
+**2:45 — When the lip reading is wrong: the touch button (20 seconds, the strongest beat)**
+
+Mouth **"Thank you"** (it is a weak phrase on purpose: it often reads as "Yes"). If it is not card 1, don't fix it with
+a shake. Point at the floating round button on the edge of the screen, **drag it** to the other side, then **tap it**.
+
+> "Lip reading will sometimes be wrong. So there's always a way out: this button, which the patient drags wherever
+> their hand can reach. Tap it, tap what you meant."
+
+Tap **Thank you** on the board. It is spoken, and the line under it says *Learned: next time this lip movement reads as
+"Thank you"*.
+
+> "And that mistake just became training data. Every correction is a labelled recording of this patient's lips. We
+> replayed our own recordings through exactly this loop: a person with none of their own samples starts at 55% first
+> card, and with four of their own samples of a phrase it is 91% first card, 100% in the three cards."
+
+Optional: confirm a wrong card on purpose with a nod, then tap the button. The board says "Said the wrong thing? Tap
+what you meant." Pick the right one: it is spoken, and the recording is moved to the right phrase, not learned wrong.
+
 **3:00 — No calibration needed (the answer to "patients can't do this")**
 
 Open **Settings**, change the name to a new one, e.g. `judge`. Mouth **"I need water"**.
@@ -136,6 +154,8 @@ Click **Proof**.
 
 | What happens | What you do | What you say |
 | --- | --- | --- |
+| None of the cards is right and you're short on time | Tap the floating touch button (or press **T**), tap the right sentence. | "That's the way out, and it just taught the model." |
+| The room is dark | Nothing. The screen edge turns into a ring light by itself; or use the touch button. | "In a dark ward the screen lights the face, and the touch board needs no light at all." |
 | The right sentence is card 2 or 3, not card 1 | Shake your head to move, then nod. Or press **2** or **3**. | "It's in the top three; a shake moves to the next one." |
 | None of the three is right | Nod on "None of these: try again", or press **Esc**. Mouth it again, bigger and slower. | "Lip reading is hard; the patient just tries again. Nothing wrong gets spoken." |
 | The "judge" starter demo misses | Press the number of the right card, or skip it. | "Starter model, 43 to 71% first time in our measurements; each confirmed sentence makes it personal." |

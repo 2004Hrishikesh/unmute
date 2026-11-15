@@ -53,22 +53,37 @@ def dtw_batch(q: np.ndarray, T: np.ndarray, window: int) -> np.ndarray:
     return acc[:, L, L] / (2 * L)
 
 
-def dtw_pairwise(T: np.ndarray, window: int) -> np.ndarray:
+PAIRWISE_BUDGET = 4_000_000  # band-DP cells held in memory at once (x8 bytes x ~3 arrays, about 100 MB)
+
+
+def dtw_pairwise(T: np.ndarray, window: int, budget: int = PAIRWISE_BUDGET) -> np.ndarray:
     """DTW distance between every pair of templates (N, L, D) -> (N, N), same normalisation as
     dtw_batch. Frame distances come from one matrix multiply (|a-b|^2 = |a|^2 + |b|^2 - 2ab), and the
-    DP runs over the band once for all N*N pairs at a time, with contiguous memory."""
+    DP runs over the band for a block of rows at a time.
+
+    Memory is bounded: the first version held all N*N pairs at once, which measured 2.4 GB at N=300 and
+    grows with N^2 (about 25 GB at N=1000). Now rows are processed in blocks of at most `budget`
+    pair-cells (L*L*rows*N), so memory stays roughly flat however many recordings there are."""
     N, L, D = T.shape
     F2 = T.reshape(N * L, D)
     sq = (F2 ** 2).sum(1)
-    C = np.sqrt(np.maximum(sq[:, None] + sq[None, :] - 2.0 * (F2 @ F2.T), 0.0))  # (N*L, N*L)
-    cost = np.ascontiguousarray(C.reshape(N, L, N, L).transpose(1, 3, 0, 2).reshape(L, L, N * N))
-    acc = np.full((L + 1, L + 1, N * N), np.inf)
-    acc[0, 0] = 0.0
-    for i in range(1, L + 1):
-        lo, hi = max(1, i - window), min(L, i + window)
-        for j in range(lo, hi + 1):
-            acc[i, j] = cost[i - 1, j - 1] + np.minimum(np.minimum(acc[i - 1, j], acc[i, j - 1]), acc[i - 1, j - 1])
-    return (acc[L, L] / (2 * L)).reshape(N, N)
+    out = np.empty((N, N))
+    rows = max(1, int(budget // (L * L * N)))
+    for r0 in range(0, N, rows):
+        r1 = min(N, r0 + rows)
+        b = r1 - r0
+        A = F2[r0 * L:r1 * L]
+        C = np.sqrt(np.maximum(sq[r0 * L:r1 * L, None] + sq[None, :] - 2.0 * (A @ F2.T), 0.0))  # (b*L, N*L)
+        cost = np.ascontiguousarray(C.reshape(b, L, N, L).transpose(1, 3, 0, 2).reshape(L, L, b * N))
+        del C
+        acc = np.full((L + 1, L + 1, b * N), np.inf)
+        acc[0, 0] = 0.0
+        for i in range(1, L + 1):
+            lo, hi = max(1, i - window), min(L, i + window)
+            for j in range(lo, hi + 1):
+                acc[i, j] = cost[i - 1, j - 1] + np.minimum(np.minimum(acc[i - 1, j], acc[i, j - 1]), acc[i - 1, j - 1])
+        out[r0:r1] = (acc[L, L] / (2 * L)).reshape(b, N)
+    return out
 
 
 @dataclass

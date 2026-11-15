@@ -105,7 +105,13 @@ def load_samples(user: str | None = None) -> dict[str, list[dict]]:
 
 
 _rec_cache: dict[str, tuple[tuple, Recogniser]] = {}
-MAX_USE_SAMPLES = 8  # per phrase per user, learned from confirmed sentences
+MAX_USE_SAMPLES = 8  # per phrase per user, learned from confirmed sentences or corrections
+# Building the pool is O(N^2) (hubness needs every pair): measured 0.1 s at 142 recordings, 1.2 s at 600,
+# 4.4 s at 1200. Above this size a new recording is folded in by a background rebuild, and predictions keep
+# using the previous model until it is ready, so nobody waits on the build.
+SYNC_REBUILD_MAX = 400
+_rebuild_lock = threading.Lock()
+_rebuilding = False
 
 
 def _fingerprint() -> tuple:
@@ -125,12 +131,37 @@ def get_recogniser(user: str | None = None) -> Recogniser | None:
     cached = _rec_cache.get("*")
     if cached and cached[0] == fp:
         return cached[1]
+    if cached and fp[0] > SYNC_REBUILD_MAX:
+        _rebuild_in_background()
+        return cached[1]
+    return _build_pool(fp)
+
+
+def _build_pool(fp: tuple) -> Recogniser | None:
     samples = [s for ss in load_samples().values() for s in ss]
     if len({s["phrase"] for s in samples}) < 2:
+        _rec_cache.pop("*", None)
         return None
     rec = Recogniser(samples, Config())
     _rec_cache["*"] = (fp, rec)
     return rec
+
+
+def _rebuild_in_background():
+    global _rebuilding
+    with _rebuild_lock:
+        if _rebuilding:
+            return
+        _rebuilding = True
+
+    def run():
+        global _rebuilding
+        try:
+            _build_pool(_fingerprint())
+        finally:
+            _rebuilding = False
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 def calibration_info(user: str) -> dict:
@@ -217,6 +248,18 @@ class LogIn(BaseModel):
     # confirmed=False: the best guess is urgent and the patient has not confirmed yet. The nurse is told
     # "possible"; the confirmed sentence that follows supersedes it. Never learned from.
     confirmed: bool = True
+    # Where the sentence was among the 3 cards (0, 1, 2), or -1 when the patient picked it from the touch board
+    # because the lip reading did not offer it. Used for the live accuracy on the Proof page.
+    rank: int | None = None
+    # Id of an earlier log row this one corrects (the patient confirmed the wrong card, then fixed it on the
+    # touch board). That row is marked and no longer counts as a lip-reading success.
+    corrects: str | None = None
+
+
+class RelabelIn(BaseModel):
+    user: str
+    id: str
+    phrase: str
 
 
 class AckIn(BaseModel):
@@ -287,11 +330,14 @@ def enroll(body: EnrollIn):
 def _consistency_check(user: str, sid: str, phrase: str) -> dict | None:
     """Does the new sample look like this person's other samples of the same phrase?
     Inconsistent calibration is the main cause of wrong guesses, so tell them right away."""
-    rec = get_recogniser(user)
-    if rec is None:
+    # Only this person's own recordings: cheap however big the shared pool is, and it is exactly the question
+    # "does this look like your other samples of the phrase".
+    own = load_samples(user).get(user, [])
+    if len({s["phrase"] for s in own}) < 2:
         return None
+    rec = Recogniser(own, Config())
     ids = [s.get("id") for s in rec.samples]
-    own_same = sum(1 for s in rec.samples if s.get("user") == user and s["phrase"] == phrase)
+    own_same = sum(1 for s in rec.samples if s["phrase"] == phrase)
     # With only one other own sample of the phrase the comparison is too noisy to act on: say nothing yet.
     if sid not in ids or own_same < 3:
         return None
@@ -368,12 +414,15 @@ async def log(body: LogIn):
         "mode": body.mode,
         "acknowledged": not urgent,
         "push": None,
+        "rank": body.rank,
     }
     if urgent:
         text = body.sentence if body.confirmed else f"Possible (not yet confirmed): {body.sentence}"
         ok, detail = await alerts.push_ntfy(NTFY_TOPIC, text, BED)
         row["push"] = detail
-    row["learned"] = _learn_from_use(user, body) if body.confirmed and body.learn and body.frames else False
+    learned_id = _learn_from_use(user, body) if body.confirmed and body.learn and body.frames else None
+    row["learned"] = bool(learned_id)
+    row["learned_id"] = learned_id
     with _lock:
         rows = read_requests()
         if body.confirmed:
@@ -383,40 +432,92 @@ async def log(body: LogIn):
                         and time.time() - r["ts"] < 180:
                     r["acknowledged"] = True
                     r["superseded_by"] = row["id"]
+        if body.corrects:
+            for r in rows:
+                if r["id"] == body.corrects and r.get("user") == user:
+                    r["corrected_to"] = body.sentence
+                    row["corrects"] = r["id"]
         rows.append(row)
         write_requests(rows)
     return row
 
 
-def _learn_from_use(user: str, body: LogIn) -> bool:
+def _learn_from_use(user: str, body: LogIn) -> str | None:
     """A confirmed sentence is a labelled recording of this person's lips: keep it as a sample.
-    Only phrases from the list, only if the lips moved, at most MAX_USE_SAMPLES per phrase (oldest go)."""
+    Only phrases from the list, only if the lips moved, at most MAX_USE_SAMPLES per phrase (oldest go).
+    Returns the new sample's id, or None."""
     if body.sentence not in PHRASES["phrases"] or len(body.frames) < 8:
-        return False
+        return None
     try:
         arr = features.to_array(body.frames)
     except ValueError:
-        return False
+        return None
     if features.lip_motion(arr, int((body.dims or {}).get("bs", 0))) < MIN_LIP_MOTION:
-        return False
+        return None
     D = len(body.frames[0])
     if any(len(f) != D for f in body.frames):
-        return False
+        return None
     sid = f"{user}__{slug(body.sentence)}__{int(time.time() * 1000)}"
     rec = {"id": sid, "user": user, "phrase": body.sentence, "frames": body.frames, "dims": body.dims,
            "fps": body.fps, "created": time.time(), "source": "use", "method": body.method}
     with _lock:
         (ENROLL_DIR / f"{sid}.json").write_text(json.dumps(rec))
-        used = []
-        for f in ENROLL_DIR.glob(f"{user}__{slug(body.sentence)}__*.json"):
-            try:
-                if json.loads(f.read_text()).get("source") == "use":
-                    used.append(f)
-            except Exception:
-                continue
-        for f in sorted(used, key=lambda f: f.name)[:-MAX_USE_SAMPLES]:
-            f.unlink()
-    return True
+        _cap_use_samples(user, body.sentence)
+    return sid
+
+
+def _cap_use_samples(user: str, phrase: str):
+    used = []
+    for f in ENROLL_DIR.glob(f"{user}__{slug(phrase)}__*.json"):
+        try:
+            if json.loads(f.read_text()).get("source") == "use":
+                used.append(f)
+        except Exception:
+            continue
+    for f in sorted(used, key=lambda f: f.name)[:-MAX_USE_SAMPLES]:
+        f.unlink()
+
+
+@app.post("/api/relabel")
+def relabel(body: RelabelIn):
+    """The patient confirmed the wrong card, then picked the right sentence on the touch board: the recording
+    that was just learned under the wrong phrase is moved to the right one, so the mistake teaches the model
+    instead of poisoning it. Only samples learned from use can be relabelled, never calibration recordings."""
+    user = safe_user(body.user)
+    if body.phrase not in PHRASES["phrases"]:
+        raise HTTPException(400, "unknown phrase")
+    if not re.fullmatch(r"[a-z0-9_-]+__[a-z0-9-]+__\d+", body.id or "") or not body.id.startswith(user + "__"):
+        raise HTTPException(400, "bad sample id")
+    src = ENROLL_DIR / f"{body.id}.json"
+    with _lock:
+        if not src.exists():
+            raise HTTPException(404, "sample not found")
+        rec = json.loads(src.read_text())
+        if rec.get("source") != "use":
+            raise HTTPException(409, "only samples learned from use can be relabelled")
+        old = rec["phrase"]
+        sid = f"{user}__{slug(body.phrase)}__{body.id.rsplit('__', 1)[1]}"
+        rec.update({"id": sid, "phrase": body.phrase, "relabelled_from": old})
+        (ENROLL_DIR / f"{sid}.json").write_text(json.dumps(rec))
+        if sid != body.id:
+            src.unlink()
+        _cap_use_samples(user, body.phrase)
+    return {"ok": True, "id": sid, "from": old, "to": body.phrase}
+
+
+@app.get("/api/usage")
+def usage(user: str | None = None):
+    """Live accuracy from real use: where the confirmed sentence was among the cards. Only rows the patient
+    confirmed with a known card position count (rank 0-2 = lip reading offered it, -1 = picked on the touch board)."""
+    rows = [r for r in read_requests() if r.get("confirmed", True) and r.get("rank") is not None
+            and not r.get("corrected_to") and (not user or r.get("user") == user)]
+    n = len(rows)
+    if not n:
+        return {"n": 0}
+    first = sum(r["rank"] == 0 for r in rows)
+    in3 = sum(0 <= r["rank"] <= 2 for r in rows)
+    return {"n": n, "top1": round(first / n, 4), "top3": round(in3 / n, 4),
+            "touch_board": round((n - in3) / n, 4), "corrections": n - in3}
 
 
 @app.get("/api/requests")

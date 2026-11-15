@@ -88,3 +88,28 @@ A bigger starter library from volunteers; measuring how many confirmed sentences
 personal model beats the starter; open vocabulary using a pretrained visual speech model (Auto-AVSR) whose rough
 transcript Gemini corrects into candidates; and validation with speech-language therapists and ICU nurses before
 any claim about care.
+
+**16. What if the lip reading picks the wrong sentence?**
+
+Nothing is spoken until the patient confirms, so a wrong card is never said by itself. If none of the three is right,
+the patient taps the floating touch button (it can be dragged anywhere the hand reaches, like a phone's assistive-touch
+button) and taps the right sentence on a board of big buttons, urgent ones first. That sentence is spoken *and* the
+recording is saved as a sample of it, so the mistake teaches the model. If they already confirmed the wrong card, the
+board offers "Said the wrong thing?": the recording is moved to the right phrase instead of being learned wrong. The
+Proof page shows live accuracy from the request log: first card, in the three cards, or fixed on the board.
+
+**17. What happens in the dark?**
+
+The camera needs some light on the face; there is no infrared camera in a laptop. Three things happen when the image
+gets too dark: a banner says so; the screen edge turns into a warm white ring light (at about 50 cm a laptop screen
+lights a face usefully); and the face tracker gets a brightened copy of the image (the camera feed itself is not
+changed). The light stays on until the room is clearly bright without it, so it doesn't flicker. And the touch board
+needs no light at all, so the patient can always talk. Honest limit: we have not measured accuracy in a dark room yet.
+
+**18. How many recordings does a patient need?**
+
+Zero to start (the shared starter model), and accuracy climbs with use. Replayed on our recordings, each predicted
+before it is learned: 0 own samples of a phrase 55% first card / 85% in the three cards; 2 own samples 80% / 93%;
+4 or more 91% / 100%. Urgent phrases do better: as deployed they are in the three cards 97.3% of the time (37
+recordings). More people recording more phrases makes the zero-sample start better; the matcher's memory now grows
+linearly, so thousands of recordings are fine.

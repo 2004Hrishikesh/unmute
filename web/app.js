@@ -18,6 +18,11 @@ let calibrated = false, calInfo = null, lastRec = null, URGENT = [];
 let lastFrame = null;
 let urgentId = null, urgentPoll = null;
 let spokenTimer = null;
+// For the touch board: the recording just confirmed, what was learned from it, and its log row, so a wrong
+// confirmation can be fixed (relabelled) instead of teaching the model the wrong phrase.
+let lastLearnedId = null, lastLogId = null, lastConfirmAt = 0, PHRASES = [];
+let atOpen = false;
+const FIX_WINDOW_MS = 60000;
 
 // ---------------------------------------------------------------- settings UI
 
@@ -58,7 +63,7 @@ const autoMode = () => recordSel.value === "auto";
 let autoConfirmMs = 4000;
 bindRange("autoConfirmS", "autoConfirmS", 4, (v) => (autoConfirmMs = v * 1000));
 const auto = new AutoRecorder({
-  enabled: () => autoMode() && calibrated && ["idle", "spoken"].includes(state),
+  enabled: () => autoMode() && calibrated && !atOpen && ["idle", "spoken"].includes(state),
   onStart: (preroll) => { ptr.begin(); for (const f of preroll) ptr.push(f); },
   onStop: ({ tooShort, lostFace }) => {
     if (!ptr.recording) return;
@@ -243,8 +248,8 @@ function moveSelection(delta, auto = false) {
 const ptr = new PushToRecord({
   button: recordBtn,
   // In switch mode the same button picks a choice, so it must not start a recording while choosing.
-  enabled: () => calibrated && (["idle", "spoken"].includes(state) || (state === "choosing" && mode() === "nod") || state === "recording"),
-  onStart: () => { speechSynthesis.cancel(); clearTimeout(spokenTimer); setState("recording"); },
+  enabled: () => calibrated && !atOpen && (["idle", "spoken"].includes(state) || (state === "choosing" && mode() === "nod") || state === "recording"),
+  onStart: () => { speechSynthesis.cancel(); clearTimeout(spokenTimer); lastLearnedId = null; lastLogId = null; setState("recording"); },
   onStop: (rec) => onRecorded(rec),
 });
 
@@ -288,21 +293,154 @@ async function confirm(i, method) {
   const opts = choices.concat([RETRY]);
   const sentence = opts[i];
   if (sentence === undefined) return;
-  if (sentence === RETRY) { setState("idle", { msg: "OK, try again." }); return; }
+  if (sentence === RETRY) { setState("idle", { msg: "OK, try again." }); nudgeTouch(); return; }
+  await sayAndLog(sentence, method, i);
+}
+
+// Speak a sentence the patient chose and log it. rank = its position among the cards (0-2), or -1 if it
+// was not on the cards (picked on the touch board). The recording is learned under this sentence.
+async function sayAndLog(sentence, method, rank, extra = {}) {
   speak(sentence);
   setState("spoken", { sentence });
+  clearTimeout(spokenTimer);
   spokenTimer = setTimeout(() => state === "spoken" && setState("idle", { msg: idleMsg() }), 6000);
+  lastConfirmAt = Date.now();
   try {
-    const learn = $("#learnToggle").checked && !!lastRec;
+    const learn = $("#learnToggle").checked && !!lastRec && extra.learn !== false;
     const row = await api("/api/log", { body: {
-      user: settings.user, sentence, method, mode: lastMode, learn,
+      user: settings.user, sentence, method, mode: lastMode, learn, rank,
       frames: learn ? lastRec.frames : null, dims: learn ? lastRec.dims : {}, fps: learn ? lastRec.fps : null,
+      corrects: extra.corrects || null,
     } });
+    lastLogId = row.id;
+    if (row.learned_id) lastLearnedId = row.learned_id;
     if (row.urgent) showUrgent(row);
     if (row.learned) { try { calInfo = await api(`/api/enrollments?user=${encodeURIComponent(settings.user)}`); } catch {} }
   } catch (e) {
     console.warn("log failed", e);
   }
+}
+
+// ---------------------------------------------------------------- touch board (assistive touch)
+// A floating button the patient (or a carer) can drag anywhere on the screen, so it sits where their hand
+// can reach. Tapping it opens every sentence as a big button. It is the way out whenever lip reading is
+// wrong, the room is dark, or the face can't be seen, and what they pick teaches the model.
+
+const atBtn = $("#atBtn"), atPanel = $("#atPanel"), atGrid = $("#atGrid");
+const atToggle = $("#atToggle");
+atToggle.checked = settings.get("assistiveTouch", true);
+function placeTouch(pos) {
+  const size = 76, m = 12;
+  const W = window.innerWidth, H = window.innerHeight;
+  const x = pos.side === "left" ? m : W - size - m;
+  const y = Math.min(H - size - m, Math.max(m + 56, pos.y * H));
+  atBtn.style.left = `${x}px`; atBtn.style.top = `${y}px`;
+}
+let atPos = settings.get("atPos", { side: "right", y: 0.62 });
+placeTouch(atPos);
+atBtn.classList.toggle("hidden", !atToggle.checked);
+atToggle.addEventListener("change", () => { settings.set("assistiveTouch", atToggle.checked); atBtn.classList.toggle("hidden", !atToggle.checked); });
+window.addEventListener("resize", () => placeTouch(atPos));
+
+let drag = null;
+atBtn.addEventListener("pointerdown", (e) => {
+  unlockAudio();
+  drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, ox: atBtn.offsetLeft, oy: atBtn.offsetTop, moved: false };
+  atBtn.setPointerCapture(e.pointerId);
+});
+atBtn.addEventListener("pointermove", (e) => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+  if (!drag.moved && Math.hypot(dx, dy) < 8) return; // a shaky tap is still a tap
+  drag.moved = true;
+  atBtn.classList.add("dragging");
+  atBtn.style.left = `${drag.ox + dx}px`; atBtn.style.top = `${drag.oy + dy}px`;
+});
+function endDrag(e, cancelled) {
+  if (!drag || e.pointerId !== drag.id) return;
+  const wasDrag = drag.moved;
+  drag = null;
+  atBtn.classList.remove("dragging");
+  if (wasDrag) {
+    const cx = atBtn.offsetLeft + 38;
+    atPos = { side: cx < window.innerWidth / 2 ? "left" : "right", y: atBtn.offsetTop / window.innerHeight };
+    settings.set("atPos", atPos);
+    placeTouch(atPos); // snap to the nearest side, like a phone's assistive-touch button
+  } else if (!cancelled) openTouch();
+}
+atBtn.addEventListener("pointerup", (e) => endDrag(e, false));
+atBtn.addEventListener("pointercancel", (e) => endDrag(e, true));
+atBtn.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); openTouch(); } });
+
+function nudgeTouch() {
+  if (!atToggle.checked) return;
+  atBtn.classList.remove("nudge"); void atBtn.offsetWidth; atBtn.classList.add("nudge");
+}
+
+function touchContext() {
+  if (state === "choosing" && lastRec) return "correct";
+  if (lastLearnedId && Date.now() - lastConfirmAt < FIX_WINDOW_MS && ["spoken", "idle"].includes(state)) return "fix";
+  return "say";
+}
+
+function openTouch() {
+  if (atOpen) return;
+  atOpen = true;
+  stopScan(); stopAutoConfirm();
+  if (state === "choosing") renderChoices(); // drop the countdown bar while the board is open
+  const ctx = touchContext();
+  $("#atTitle").textContent = { correct: "Not on the cards? Tap what you said.", fix: "Said the wrong thing? Tap what you meant.",
+    say: "Tap a sentence to say it out loud" }[ctx];
+  $("#atSub").textContent = {
+    correct: "Unmute says it out loud and learns your lips for that sentence, so next time it is on the first card.",
+    fix: "Unmute says it out loud and moves what it just learned to the right sentence.",
+    say: calibrated ? "Works in the dark, without the camera, and with any pointer or switch." : "Works without the camera or calibration.",
+  }[ctx];
+  const urgent = PHRASES.filter((p) => URGENT.includes(p));
+  const rest = PHRASES.filter((p) => !URGENT.includes(p));
+  atGrid.innerHTML = "";
+  for (const p of [...urgent, ...rest]) {
+    const b = document.createElement("button");
+    b.className = "at-item" + (URGENT.includes(p) ? " urgent-item" : "") + (ctx === "correct" && choices.includes(p) ? " on-card" : "");
+    b.textContent = p;
+    if (URGENT.includes(p)) { const t = document.createElement("span"); t.className = "tag"; t.textContent = "alerts the nurse"; b.appendChild(t); }
+    else if (ctx === "correct" && choices.includes(p)) { const t = document.createElement("span"); t.className = "tag"; t.textContent = `card ${choices.indexOf(p) + 1}`; b.appendChild(t); }
+    b.addEventListener("click", () => pickTouch(p, ctx));
+    atGrid.appendChild(b);
+  }
+  atPanel.classList.remove("hidden");
+  const first = atGrid.querySelector("button"); if (first) first.focus({ preventScroll: true });
+}
+
+function closeTouch(resume = true) {
+  if (!atOpen) return;
+  atOpen = false;
+  atPanel.classList.add("hidden");
+  if (resume && state === "choosing") { choiceShownAt = performance.now(); gest.reset(); blinker.reset(); startScan(); startAutoConfirm(); renderChoices(); }
+  atBtn.focus({ preventScroll: true });
+}
+$("#atClose").addEventListener("click", () => closeTouch());
+atPanel.addEventListener("click", (e) => { if (e.target === atPanel) closeTouch(); });
+
+async function pickTouch(sentence, ctx) {
+  closeTouch(false);
+  beep(784, 80, 0.12);
+  if (ctx === "correct") {
+    const rank = choices.indexOf(sentence); // -1 = the lip reading did not offer it
+    state = "choosing"; // sayAndLog moves on to "spoken"
+    await sayAndLog(sentence, "touch", rank);
+    if (rank < 0) reasonEl.textContent = `Learned: next time this lip movement reads as "${sentence}".`;
+    return;
+  }
+  if (ctx === "fix") {
+    const wrongId = lastLearnedId, wrongRow = lastLogId;
+    lastLearnedId = null;
+    try { await api("/api/relabel", { body: { user: settings.user, id: wrongId, phrase: sentence } }); } catch (e) { console.warn("relabel failed", e); }
+    await sayAndLog(sentence, "touch-fix", -1, { learn: false, corrects: wrongRow });
+    reasonEl.textContent = `Fixed: that recording now teaches "${sentence}".`;
+    return;
+  }
+  await sayAndLog(sentence, "touch", null, { learn: false });
 }
 
 recordBtn.addEventListener("pointerdown", () => {
@@ -337,6 +475,8 @@ $("#urgentAck").addEventListener("click", () => clearUrgent(true));
 window.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
   unlockAudio();
+  if (atOpen) { if (e.key === "Escape") { e.preventDefault(); closeTouch(); } return; }
+  if (e.key === "t" || e.key === "T") { openTouch(); return; }
   if (state !== "choosing") return;
   if (autoTimer && !["1", "2", "3", "Enter"].includes(e.key)) { stopAutoConfirm(); renderChoices(); } // any other key = "wait, not that"
   if (mode() === "switch" && (e.code === "Space" || e.key === "Enter") && !e.repeat) {
@@ -360,7 +500,7 @@ function onFrame(frame, ts) {
   else camMsg.textContent = state === "recording" ? (autoMode() ? "Lips moving: recording" : "Recording") : (autoMode() ? "Listening to your lips" : "Tracking your lips");
   camMsg.classList.toggle("hidden", !!frame && state !== "recording");
 
-  if (frame && state === "choosing" && performance.now() - choiceShownAt > 600) {
+  if (frame && state === "choosing" && !atOpen && performance.now() - choiceShownAt > 600) {
     if (mode() === "nod") {
       const g = gest.update(frame.pitch, frame.yaw, ts);
       if (g === "nod") confirm(selected, "nod");
@@ -377,6 +517,38 @@ function onFrame(frame, ts) {
     }
   }
 }
+
+// ---------------------------------------------------------------- dark room
+// Too dark: the screen turns into a ring light around the edge (lights the face from ~50 cm), and the face
+// tracker gets a brightened copy of the image. The light stays on once it is on (otherwise lighting the face
+// would read as "bright enough", switch the light off, and flicker), until the room is clearly bright
+// without it or someone presses "Screen light off". The touch board needs no light at all.
+const faceLightToggle = $("#faceLightToggle");
+faceLightToggle.checked = settings.get("faceLight", true);
+faceLightToggle.addEventListener("change", () => { settings.set("faceLight", faceLightToggle.checked); if (!faceLightToggle.checked) setFaceLight(false); });
+let faceLight = false, brightSince = 0, lightDismissed = false;
+function setFaceLight(on) {
+  faceLight = on;
+  document.body.classList.toggle("facelight", on);
+  if (tracker) tracker.gain = on ? 2.2 : 1;
+  $("#lightOff").classList.toggle("hidden", !on);
+  $("#darkText").textContent = on
+    ? "Dark room: the screen is lighting your face. A bed light works better. The touch button always works."
+    : "Turn on the bed light: too dark to read lips. The touch button still works.";
+}
+function onDark(dark) {
+  if (dark) $("#darkBanner").classList.remove("hidden");
+  if (dark && faceLightToggle.checked && !faceLight && !lightDismissed) setFaceLight(true);
+  if (!dark && !faceLight) $("#darkBanner").classList.add("hidden");
+  if (dark) nudgeTouch();
+}
+function checkLightOff() {
+  if (!faceLight || !bright || bright.value == null) return;
+  // Clearly bright even with our light: a real lamp is on.
+  if (bright.value > darkT * 2.2) { if (!brightSince) brightSince = Date.now(); } else brightSince = 0;
+  if (brightSince && Date.now() - brightSince > 8000) { setFaceLight(false); $("#darkBanner").classList.add("hidden"); brightSince = 0; }
+}
+$("#lightOff").addEventListener("click", () => { lightDismissed = true; setFaceLight(false); setTimeout(() => (lightDismissed = false), 120000); });
 
 let lastPred = null;
 function renderDebug(pred) {
@@ -399,7 +571,7 @@ setInterval(() => $("#settings").open && renderDebug(), 250);
 let tracker = null, bright = null;
 async function boot() {
   applyMode();
-  api("/api/phrases").then((p) => (URGENT = p.urgent || [])).catch(() => {});
+  api("/api/phrases").then((p) => { URGENT = p.urgent || []; PHRASES = p.phrases || []; }).catch(() => {});
   setState("loading", { msg: "Starting camera and face tracker" });
   refreshStatus();
   // Load the face tracker while the camera starts; they don't depend on each other.
@@ -420,7 +592,8 @@ async function boot() {
     setState("error", { msg: "Face tracker failed to load (needs internet once, or run scripts/fetch_vendor.sh): " + e.message });
     return;
   }
-  bright = new BrightnessCheck(video, (dark) => $("#darkBanner").classList.toggle("hidden", !dark), () => darkT);
+  bright = new BrightnessCheck(video, onDark, () => darkT);
+  setInterval(checkLightOff, 1000);
   if (camOk) await refreshUser();
   setInterval(refreshStatus, 15000);
 }

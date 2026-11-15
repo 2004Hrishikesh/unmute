@@ -235,10 +235,11 @@ async def rerank(candidates: list[dict], context: dict, use_gemini: bool = True)
     deadline = time.monotonic() + TIMEOUT_S
     reason = "every Gemini Flash model is busy or out of free quota right now"
     # Quota / overload errors come back in ~0.1 s, so there is usually time to try the next model.
-    for _ in range(3):
+    for attempt in range(3):
         model = _current_model()
         left = deadline - time.monotonic()
-        if model is None or left < 0.4:
+        # A retry on the next model needs a useful slice of the budget; the first try always runs.
+        if model is None or (attempt > 0 and left < 0.4):
             break
         try:
             data = await asyncio.wait_for(asyncio.to_thread(_call_gemini, prompt, model), timeout=left)

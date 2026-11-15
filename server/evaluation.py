@@ -94,6 +94,7 @@ def evaluate_all(samples_by_user: dict[str, list[dict]], cfg: Config | None = No
         "users": users,
         "pooled": evaluate_pooled(samples_by_user, cfg),
         "starter": evaluate_starter(samples_by_user, cfg),
+        "learning": evaluate_learning(samples_by_user, cfg),
     }
 
 
@@ -143,4 +144,48 @@ def evaluate_starter(samples_by_user: dict[str, list[dict]], cfg: Config) -> dic
             r["chance_top1"] = round(1 / len(phrases), 4)
             r["chance_top3"] = round(min(1.0, 3 / len(phrases)), 4)
             out["users"][user] = r
+    return out
+
+
+def evaluate_learning(samples_by_user: dict[str, list[dict]], cfg: Config, max_bucket: int = 4) -> dict:
+    """Learning from use, replayed: a person starts with NO recordings of their own (only other people's) and
+    uses Unmute. Their recordings are replayed in the order they were made; each one is first predicted, then
+    added to the pool under its true phrase, which is what confirming a card or correcting on the touch board
+    does. Accuracy is grouped by how many of the person's own samples of that phrase the model already had.
+
+    A recording whose phrase nobody has recorded yet can't be right, so it is counted as "new phrase" and
+    left out of the accuracy. Caveat: our recordings of a phrase were made one after another, so samples 1-4
+    are a little easier than a sample made hours later."""
+    out = {"method": "replay in recording order; predict, then learn the true phrase", "users": {}, "overall": {}}
+    tot: dict[int, list[int]] = {}
+    for user, ss in sorted(samples_by_user.items()):
+        others = [s for u, other in samples_by_user.items() if u != user for s in other]
+        learned: list[dict] = []
+        own_count: Counter = Counter()
+        buckets: dict[int, list[int]] = {}
+        new_phrase = 0
+        for q in sorted(ss, key=lambda s: (s.get("created") or 0, s.get("id") or "")):
+            pool = others + learned
+            known = {s["phrase"] for s in pool}
+            if q["phrase"] not in known or len(known) < 2:
+                new_phrase += 1
+            else:
+                names = [r["phrase"] for r in Recogniser(pool, cfg).rank(q["frames"], top=3)]
+                b = min(own_count[q["phrase"]], max_bucket)
+                hit1 = int(bool(names) and names[0] == q["phrase"])
+                hit3 = int(q["phrase"] in names)
+                for acc in (buckets.setdefault(b, [0, 0, 0]), tot.setdefault(b, [0, 0, 0])):
+                    acc[0] += 1
+                    acc[1] += hit1
+                    acc[2] += hit3
+            learned.append(q)
+            own_count[q["phrase"]] += 1
+        out["users"][user] = {
+            "new_phrase": new_phrase,
+            "by_own_samples": {str(b): {"n": v[0], "top1": round(v[1] / v[0], 4), "top3": round(v[2] / v[0], 4)}
+                               for b, v in sorted(buckets.items())},
+        }
+    out["overall"] = {str(b): {"n": v[0], "top1": round(v[1] / v[0], 4), "top3": round(v[2] / v[0], 4)}
+                      for b, v in sorted(tot.items())}
+    out["max_bucket"] = max_bucket
     return out
